@@ -70,11 +70,12 @@ const SUPABASE_URL = "https://irhmrbmanojkxwmxdlcn.supabase.co";
 const SUPABASE_KEY = "sb_publishable_ko2fXJQyKTgH5lEyd_C2yg_lhIR01YS";
 const FN_GENERATE = "generate-workout-ts";
 const FN_NUTRITION = "generate-nutrition-ts";
+const FN_COACH = "ai-coach";
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 if ('serviceWorker' in navigator) { window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); }); }
 try{ var __th=localStorage.getItem('coachia-theme'); if(__th) document.documentElement.setAttribute('data-theme',__th); }catch(e){}
 
-const S = { screen:'login', user:null, profile:null, todayCheckin:null, todayScore:null, weights:[], lifts:[], chargeExo:null, history:[], athletes:[], selAthlete:null, selWeights:[], nutrition:null, meals:[], genNut:false, runs:[], checkinCount:0, comps:[], workout:null, exercises:[], started:false, generating:false, msg:null };
+const S = { screen:'login', user:null, profile:null, todayCheckin:null, todayScore:null, weights:[], lifts:[], chargeExo:null, history:[], athletes:[], selAthlete:null, selWeights:[], nutrition:null, meals:[], genNut:false, runs:[], checkinCount:0, comps:[], chat:[], aiThinking:false, report:null, reportLoading:false, workout:null, exercises:[], started:false, generating:false, msg:null };
 const today = () => new Date().toISOString().slice(0,10);
 
 function computeScore(c){
@@ -174,7 +175,7 @@ function scrDash(){
     goalHint+compBanner()+(p.role==='admin'?'<div class="card" onclick="go(\'coach\')" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between"><div style="display:flex;align-items:center;gap:10px"><i class="ti ti-users" style="color:var(--accent);font-size:20px"></i><span style="font-weight:700">Espace coach</span></div><i class="ti ti-chevron-right" style="color:var(--faint)"></i></div>':'')+scoreCard+
     (hasScore?'<button class="btn outline" onclick="go(\'checkin\')" style="margin-bottom:13px"><i class="ti ti-refresh"></i> Modifier mon check-in du jour</button>':'')+
     seance+
-    '<div class="card"><div class="row" style="margin-bottom:10px"><div class="label">Poids actuel</div><span class="sub" style="font-weight:700;color:var(--ink)">'+lastW+'</span></div>'+weightSVG(w)+'</div>'+'<div class="card" onclick="go(\'charges\')" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between"><div style="display:flex;align-items:center;gap:10px"><i class="ti ti-chart-line" style="color:var(--accent);font-size:20px"></i><span style="font-weight:700">Progression des charges</span></div><i class="ti ti-chevron-right" style="color:var(--faint)"></i></div>'+menuCard('Compétitions','comps')+menuCard('Sorties course','runs')+menuCard('Mes badges','badges')+menuCard('Question / Avis','feedback');
+    '<div class="card"><div class="row" style="margin-bottom:10px"><div class="label">Poids actuel</div><span class="sub" style="font-weight:700;color:var(--ink)">'+lastW+'</span></div>'+weightSVG(w)+'</div>'+'<div class="card" onclick="go(\'charges\')" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between"><div style="display:flex;align-items:center;gap:10px"><i class="ti ti-chart-line" style="color:var(--accent);font-size:20px"></i><span style="font-weight:700">Progression des charges</span></div><i class="ti ti-chevron-right" style="color:var(--faint)"></i></div>'+menuCard('Assistant IA','assistant')+menuCard('Rapport de la semaine','report')+menuCard('Compétitions','comps')+menuCard('Sorties course','runs')+menuCard('Mes badges','badges')+menuCard('Question / Avis','feedback');
 }
 function scrWorkout(){
   if(S.generating){ return '<div class="tbar"><button class="ic" onclick="go(\'dash\')"><i class="ti ti-chevron-left"></i></button><h2 style="font-size:19px">Séance du jour</h2><span style="width:38px"></span></div><div class="center" style="min-height:380px"><div class="spin" style="border-color:var(--accent);border-top-color:transparent;width:30px;height:30px"></div><div>L\'IA génère ta séance…</div><div class="sub">Quelques secondes</div></div>'; }
@@ -439,6 +440,35 @@ async function doExport(){
   }catch(e){ S.msg={k:'err',t:'Erreur export : '+(e.message||e)}; }
   render();
 }
+async function invokeFn(base, body){
+  try{ var r=await db.functions.invoke(base,{body:body}); if(!r.error) return r; var r2=await db.functions.invoke(base+'-ts',{body:body}); return r2.error? r : r2; }
+  catch(e){ try{ return await db.functions.invoke(base+'-ts',{body:body}); }catch(e2){ return {error:e2}; } }
+}
+function scrAssistant(){
+  var tb='<div class="tbar"><button class="ic" onclick="go(\'dash\')"><i class="ti ti-chevron-left"></i></button><h2 style="font-size:19px">Assistant IA</h2><span style="width:38px"></span></div>';
+  var conv=(S.chat||[]).map(function(m){ var me=m.role==='user'; return '<div class="card'+(me?' flat':'')+'" style="margin-bottom:10px"><div class="label" style="margin-bottom:4px">'+(me?'Vous':'Coach IA')+'</div><div style="font-size:14px;line-height:1.5">'+esc(m.text).replace(/\n/g,'<br>')+'</div></div>'; }).join('');
+  var think=S.aiThinking?'<div class="card flat"><div class="sub">Le coach réfléchit…</div></div>':'';
+  return tb+conv+think+'<div class="card"><textarea id="ai-q" class="in" style="min-height:70px;resize:vertical" placeholder="Pose ta question (ex : comment améliorer mon temps Hyrox ?)"></textarea><button class="btn" onclick="doAsk()" style="margin-top:8px"'+(S.aiThinking?' disabled':'')+'>Demander au coach IA</button></div>';
+}
+async function doAsk(){
+  var el=document.getElementById('ai-q'); var q=(el?el.value:'').trim(); if(!q) return;
+  S.chat=S.chat||[]; S.chat.push({role:'user',text:q}); S.aiThinking=true; render();
+  try{ var r=await invokeFn('ai-coach',{mode:'chat',question:q}); var ans=(r.data&&r.data.answer)||(r.data&&r.data.error)||'Désolé, je n\'ai pas pu répondre. Vérifie que la fonction ai-coach est déployée.'; S.chat.push({role:'ai',text:ans}); }
+  catch(e){ S.chat.push({role:'ai',text:'Erreur : '+(e.message||e)}); }
+  S.aiThinking=false; render();
+}
+function scrReport(){
+  var tb='<div class="tbar"><button class="ic" onclick="go(\'dash\')"><i class="ti ti-chevron-left"></i></button><h2 style="font-size:19px">Rapport de la semaine</h2><span style="width:38px"></span></div>';
+  if(S.reportLoading) return tb+'<div class="center" style="min-height:300px"><div class="spin" style="border-color:var(--accent);border-top-color:transparent;width:30px;height:30px"></div><div>Analyse de ta semaine…</div></div>';
+  var body=S.report?('<div class="card"><div style="font-size:14px;line-height:1.55">'+esc(S.report).replace(/\n/g,'<br>')+'</div></div>'):'<div class="card flat"><div class="sub">Génère ton bilan de la semaine : assiduité, sommeil, séances réalisées, et conseils pour progresser.</div></div>';
+  return tb+body+'<button class="btn" onclick="doReport()">'+(S.report?'Régénérer le rapport':'Générer mon rapport')+'</button>';
+}
+async function doReport(){
+  S.reportLoading=true; render();
+  try{ var r=await invokeFn('ai-coach',{mode:'report'}); S.report=(r.data&&r.data.answer)||(r.data&&r.data.error)||'Impossible de générer le rapport. Vérifie que la fonction ai-coach est déployée.'; }
+  catch(e){ S.report='Erreur : '+(e.message||e); }
+  S.reportLoading=false; render();
+}
 function navBar(){
   const b=(ic,t)=>'<button class="'+(S.screen===t?'on':'')+'" onclick="go(\''+t+'\')" style="font-size:11px;font-weight:700;color:inherit;letter-spacing:.02em">'+ic+'</button>';
   return b('Accueil','dash')+b('Séance','workout')+b('Nutrition','nutrition')+b('Check-in','checkin')+b('Agenda','calendar');
@@ -449,7 +479,7 @@ function render(extra){
   if(S.screen==='login'){ html=scrLogin(); nav.style.display='none'; }
   else if(S.screen==='result'){ html=scrResult(extra); nav.style.display='flex'; nav.innerHTML=navBar(); }
   else { nav.style.display='flex'; nav.innerHTML=navBar();
-    html = S.screen==='checkin'?scrCheckin():(S.screen==='workout'?scrWorkout():(S.screen==='profile'?scrProfile():(S.screen==='genopts'?scrGenOptions():(S.screen==='charges'?scrCharges():(S.screen==='calendar'?scrCalendar():(S.screen==='coach'?scrCoach():(S.screen==='coachDetail'?scrCoachDetail():(S.screen==='nutrition'?scrNutrition():(S.screen==='runs'?scrRuns():(S.screen==='badges'?scrBadges():(S.screen==='feedback'?scrFeedback():(S.screen==='comps'?scrComps():scrDash()))))))))))));
+    html = S.screen==='checkin'?scrCheckin():(S.screen==='workout'?scrWorkout():(S.screen==='profile'?scrProfile():(S.screen==='genopts'?scrGenOptions():(S.screen==='charges'?scrCharges():(S.screen==='calendar'?scrCalendar():(S.screen==='coach'?scrCoach():(S.screen==='coachDetail'?scrCoachDetail():(S.screen==='nutrition'?scrNutrition():(S.screen==='runs'?scrRuns():(S.screen==='badges'?scrBadges():(S.screen==='feedback'?scrFeedback():(S.screen==='comps'?scrComps():(S.screen==='assistant'?scrAssistant():(S.screen==='report'?scrReport():scrDash()))))))))))))));
   }
   sc.innerHTML=html; sc.scrollTop=0; S.msg=null;
   const e=document.getElementById('i-email'); if(e) e.addEventListener('keydown',ev=>{if(ev.key==='Enter')document.getElementById('i-pass').focus();});
