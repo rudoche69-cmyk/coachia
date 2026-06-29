@@ -72,7 +72,7 @@ const FN_NUTRITION = "generate-nutrition-ts";
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 if ('serviceWorker' in navigator) { window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); }); }
 
-const S = { screen:'login', user:null, profile:null, todayCheckin:null, todayScore:null, weights:[], lifts:[], chargeExo:null, history:[], athletes:[], selAthlete:null, selWeights:[], nutrition:null, meals:[], genNut:false, workout:null, exercises:[], started:false, generating:false, msg:null };
+const S = { screen:'login', user:null, profile:null, todayCheckin:null, todayScore:null, weights:[], lifts:[], chargeExo:null, history:[], athletes:[], selAthlete:null, selWeights:[], nutrition:null, meals:[], genNut:false, runs:[], checkinCount:0, workout:null, exercises:[], started:false, generating:false, msg:null };
 const today = () => new Date().toISOString().slice(0,10);
 
 function computeScore(c){
@@ -114,6 +114,8 @@ async function loadAll(){
   try{ const lr = await db.from('workout_exercises').select('name,actual_load,workouts!inner(date,athlete_id)').eq('workouts.athlete_id',uid).not('actual_load','is',null); S.lifts=(lr.data||[]).map(function(r){return {name:r.name,load:Number(r.actual_load),date:(r.workouts&&r.workouts.date)||''};}).sort(function(a,b){return a.date<b.date?-1:1;}); }catch(_){ S.lifts=[]; }
   S.started = !!(wk && wk.status==='realisee');
   try{ const npr = await db.from('nutrition_plans').select('*').eq('athlete_id',uid).order('created_at',{ascending:false}).limit(1).maybeSingle(); S.nutrition=npr.data||null; if(S.nutrition){ const mr=await db.from('meals').select('*').eq('plan_id',S.nutrition.id); S.meals=mr.data||[]; } else { S.meals=[]; } }catch(_){ S.nutrition=null; S.meals=[]; }
+  try{ const rn=await db.from('runs').select('*').eq('athlete_id',uid).order('date',{ascending:false}).limit(60); S.runs=rn.data||[]; }catch(_){ S.runs=[]; }
+  try{ const cc=await db.from('daily_checkins').select('id',{count:'exact',head:true}).eq('athlete_id',uid); S.checkinCount=cc.count||0; }catch(_){ S.checkinCount=0; }
   try{ const hr = await db.from('workouts').select('*').eq('athlete_id',uid).order('date',{ascending:false}).limit(60); S.history=hr.data||[]; }catch(_){ S.history=[]; }
   S.athletes=[];
   if(S.profile && S.profile.role==='admin'){ try{ const ar = await db.from('profiles').select('id,first_name,last_name,main_goal').neq('id',uid).order('first_name',{ascending:true}); const sr = await db.from('fitness_scores').select('athlete_id,level,score,date').order('date',{ascending:false}).limit(500); const latest={}; (sr.data||[]).forEach(function(r){ if(!latest[r.athlete_id]) latest[r.athlete_id]=r; }); S.athletes=(ar.data||[]).map(function(a){ a.score=latest[a.id]||null; return a; }); }catch(_){ S.athletes=[]; } }
@@ -169,7 +171,7 @@ function scrDash(){
     goalHint+(p.role==='admin'?'<div class="card" onclick="go(\'coach\')" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between"><div style="display:flex;align-items:center;gap:10px"><i class="ti ti-users" style="color:var(--accent);font-size:20px"></i><span style="font-weight:700">Espace coach</span></div><i class="ti ti-chevron-right" style="color:var(--faint)"></i></div>':'')+scoreCard+
     (hasScore?'<button class="btn outline" onclick="go(\'checkin\')" style="margin-bottom:13px"><i class="ti ti-refresh"></i> Modifier mon check-in du jour</button>':'')+
     seance+
-    '<div class="card"><div class="row" style="margin-bottom:10px"><div class="label">Poids actuel</div><span class="sub" style="font-weight:700;color:var(--ink)">'+lastW+'</span></div>'+weightSVG(w)+'</div>'+'<div class="card" onclick="go(\'charges\')" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between"><div style="display:flex;align-items:center;gap:10px"><i class="ti ti-chart-line" style="color:var(--accent);font-size:20px"></i><span style="font-weight:700">Progression des charges</span></div><i class="ti ti-chevron-right" style="color:var(--faint)"></i></div>';
+    '<div class="card"><div class="row" style="margin-bottom:10px"><div class="label">Poids actuel</div><span class="sub" style="font-weight:700;color:var(--ink)">'+lastW+'</span></div>'+weightSVG(w)+'</div>'+'<div class="card" onclick="go(\'charges\')" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between"><div style="display:flex;align-items:center;gap:10px"><i class="ti ti-chart-line" style="color:var(--accent);font-size:20px"></i><span style="font-weight:700">Progression des charges</span></div><i class="ti ti-chevron-right" style="color:var(--faint)"></i></div>'+menuCard('Sorties course','runs')+menuCard('Mes badges','badges')+menuCard('Question / Avis','feedback');
 }
 function scrWorkout(){
   if(S.generating){ return '<div class="tbar"><button class="ic" onclick="go(\'dash\')"><i class="ti ti-chevron-left"></i></button><h2 style="font-size:19px">Séance du jour</h2><span style="width:38px"></span></div><div class="center" style="min-height:380px"><div class="spin" style="border-color:var(--accent);border-top-color:transparent;width:30px;height:30px"></div><div>L\'IA génère ta séance…</div><div class="sub">Quelques secondes</div></div>'; }
@@ -219,7 +221,7 @@ function inField(id,label,cur,type,ph){
 }
 function scrProfile(){
   const p = S.profile||{};
-  const goals=['Hyrox Solo','Hyrox Double','Football','Running','Trail','Marathon','Semi-marathon','Spartan Race','Cross Training','Musculation','Force','Hypertrophie','Explosivité','Perte de poids','Recomposition corporelle','Prise de masse','Santé','Réathlétisation','Retour de blessure','Préparation concours','Préparation militaire'].map(g=>[g,g]);
+  const goals=['Hyrox Solo','Hyrox Double','Football','Running','Courir plus vite','Trail','Marathon','Semi-marathon','Spartan Race','Cross Training','Musculation','Force','Hypertrophie','Explosivité','Perte de poids','Recomposition corporelle','Prise de masse','Prise de masse musculaire','Santé','Réathlétisation','Retour de blessure','Préparation concours','Préparation militaire'].map(g=>[g,g]);
   return '<div class="tbar"><button class="ic" onclick="go(\'dash\')"><i class="ti ti-chevron-left"></i></button><h2 style="font-size:19px">Mon profil</h2><button class="ic" onclick="doLogout()" title="Se déconnecter"><i class="ti ti-logout"></i></button></div>'+
     (S.msg?'<div class="msg '+S.msg.k+'">'+S.msg.t+'</div>':'')+
     inField('pf-first','Prénom',p.first_name,'text','Ton prénom')+
@@ -339,6 +341,62 @@ async function doGenNutrition(){
     await loadAll(); S.screen='nutrition'; render();
   }catch(e){ S.genNut=false; S.msg={k:'err',t:'Erreur : '+(e.message||e)}; render(); }
 }
+function menuCard(label,target){ return '<div class="card" onclick="go(\''+target+'\')" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between"><span style="font-weight:700">'+label+'</span><span style="color:var(--faint);font-size:18px">›</span></div>'; }
+function scrRuns(){
+  var runs=S.runs||[];
+  var total=Math.round(runs.reduce(function(a,r){return a+(Number(r.distance_km)||0);},0)*10)/10;
+  var tb='<div class="tbar"><button class="ic" onclick="go(\'dash\')"><i class="ti ti-chevron-left"></i></button><h2 style="font-size:19px">Sorties course</h2><span style="width:38px"></span></div>';
+  var msg=S.msg?'<div class="msg '+S.msg.k+'">'+S.msg.t+'</div>':'';
+  var stat='<div class="row" style="gap:8px;margin-bottom:12px"><div class="card flat" style="flex:1;margin:0;text-align:center;padding:11px"><div class="label">Sorties</div><div class="big" style="font-size:20px;margin-top:3px">'+runs.length+'</div></div><div class="card flat" style="flex:1;margin:0;text-align:center;padding:11px"><div class="label">Total</div><div class="big" style="font-size:20px;margin-top:3px">'+total+' km</div></div></div>';
+  var form='<div class="card"><div class="flabel">Ajouter une sortie</div><div class="row" style="gap:8px;margin-top:7px"><input id="run-km" class="in" type="number" step="0.1" placeholder="Distance (km)" style="margin-top:0"><input id="run-min" class="in" type="number" step="1" placeholder="Durée (min)" style="margin-top:0"></div><input id="run-note" class="in" type="text" placeholder="Ressenti / notes (optionnel)"><button class="btn" onclick="doSaveRun()" style="margin-top:10px">Enregistrer la sortie</button></div>';
+  var list=runs.length?('<div class="card" style="padding:6px 14px">'+runs.map(function(r){var km=Number(r.distance_km)||0;var mn=Number(r.duration_min)||0;var pace=(km>0&&mn>0)?(mn/km):0;var ps=pace?(Math.floor(pace)+':'+('0'+Math.round((pace%1)*60)).slice(-2)+' /km'):'';var d=new Date((r.date||'')+'T00:00:00');var ds=isNaN(d)?(r.date||''):d.toLocaleDateString('fr-FR',{day:'numeric',month:'short'});return '<div class="ex"><div class="n"><i class="ti ti-run"></i></div><div class="m"><div class="nm">'+km+' km'+(mn?' · '+mn+' min':'')+'</div><div class="ds">'+ds+(ps?' · '+ps:'')+(r.notes?' · '+esc(r.notes):'')+'</div></div></div>';}).join('')+'</div>'):'';
+  return tb+msg+stat+form+list;
+}
+async function doSaveRun(){
+  var km=parseFloat(document.getElementById('run-km').value)||null;
+  var mn=parseFloat(document.getElementById('run-min').value)||null;
+  var note=(document.getElementById('run-note').value||'').trim()||null;
+  if(!km){ S.msg={k:'err',t:'Indique au moins la distance.'}; render(); return; }
+  try{ await db.from('runs').insert({athlete_id:S.user.id, date:today(), distance_km:km, duration_min:mn, notes:note}); await loadAll(); S.msg={k:'ok',t:'Sortie enregistrée !'}; }
+  catch(e){ S.msg={k:'err',t:'Erreur : '+(e.message||e)}; }
+  render();
+}
+function computeBadges(){
+  var done=(S.history||[]).filter(function(w){return w.status==='realisee';}).length;
+  var ci=S.checkinCount||0;
+  var runs=(S.runs||[]).length;
+  var totalKm=(S.runs||[]).reduce(function(a,r){return a+(Number(r.distance_km)||0);},0);
+  var w=S.weights||[]; var delta=w.length>=2?(Number(w[w.length-1].weight)-Number(w[0].weight)):0;
+  return [
+    {n:'Premier pas', d:'1er check-in', ok:ci>=1},
+    {n:'Régulier', d:'7 check-ins', ok:ci>=7},
+    {n:'Assidu', d:'30 check-ins', ok:ci>=30},
+    {n:'Première séance', d:'1 séance terminée', ok:done>=1},
+    {n:'Machine', d:'10 séances', ok:done>=10},
+    {n:'Coureur', d:'1re sortie', ok:runs>=1},
+    {n:'Fondeur', d:'42 km cumulés', ok:totalKm>=42},
+    {n:'Transformation', d:'-2 kg', ok:delta<=-2}
+  ];
+}
+function scrBadges(){
+  var tb='<div class="tbar"><button class="ic" onclick="go(\'dash\')"><i class="ti ti-chevron-left"></i></button><h2 style="font-size:19px">Mes badges</h2><span style="width:38px"></span></div>';
+  var bs=computeBadges();
+  var got=bs.filter(function(b){return b.ok;}).length;
+  var grid='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'+bs.map(function(b){return '<div class="card" style="margin:0;text-align:center;padding:16px 10px;opacity:'+(b.ok?'1':'0.4')+'"><div style="font-size:30px">'+(b.ok?'🏅':'🔒')+'</div><div style="font-weight:700;font-size:14px;margin-top:6px">'+b.n+'</div><div class="sub" style="font-size:11px">'+b.d+'</div></div>';}).join('')+'</div>';
+  return tb+'<div class="card flat" style="text-align:center"><div class="label">Badges débloqués</div><div class="big">'+got+' / '+bs.length+'</div></div>'+grid;
+}
+function scrFeedback(){
+  var tb='<div class="tbar"><button class="ic" onclick="go(\'dash\')"><i class="ti ti-chevron-left"></i></button><h2 style="font-size:19px">Question / Avis</h2><span style="width:38px"></span></div>';
+  var msg=S.msg?'<div class="msg '+S.msg.k+'">'+S.msg.t+'</div>':'';
+  return tb+msg+'<div class="card"><div class="sub" style="margin-bottom:8px">Une idée, un bug, une demande ? Écris-nous : ça aide à améliorer l\'app.</div><textarea id="fb-msg" class="in" style="min-height:120px;resize:vertical" placeholder="Ton message..."></textarea><button class="btn" onclick="doSendFeedback()" style="margin-top:10px">Envoyer mon message</button></div>';
+}
+async function doSendFeedback(){
+  var m=(document.getElementById('fb-msg').value||'').trim();
+  if(!m){ S.msg={k:'err',t:'Écris ton message avant d\'envoyer.'}; render(); return; }
+  try{ await db.from('feedback').insert({user_id:S.user.id, message:m}); S.msg={k:'ok',t:'Merci ! Ton message a bien été envoyé.'}; }
+  catch(e){ S.msg={k:'err',t:'Erreur : '+(e.message||e)}; }
+  render();
+}
 function navBar(){
   const b=(ic,t)=>'<button class="'+(S.screen===t?'on':'')+'" onclick="go(\''+t+'\')" style="font-size:11px;font-weight:700;color:inherit;letter-spacing:.02em">'+ic+'</button>';
   return b('Accueil','dash')+b('Séance','workout')+b('Nutrition','nutrition')+b('Check-in','checkin')+b('Agenda','calendar');
@@ -349,7 +407,7 @@ function render(extra){
   if(S.screen==='login'){ html=scrLogin(); nav.style.display='none'; }
   else if(S.screen==='result'){ html=scrResult(extra); nav.style.display='flex'; nav.innerHTML=navBar(); }
   else { nav.style.display='flex'; nav.innerHTML=navBar();
-    html = S.screen==='checkin'?scrCheckin():(S.screen==='workout'?scrWorkout():(S.screen==='profile'?scrProfile():(S.screen==='genopts'?scrGenOptions():(S.screen==='charges'?scrCharges():(S.screen==='calendar'?scrCalendar():(S.screen==='coach'?scrCoach():(S.screen==='coachDetail'?scrCoachDetail():(S.screen==='nutrition'?scrNutrition():scrDash()))))))));
+    html = S.screen==='checkin'?scrCheckin():(S.screen==='workout'?scrWorkout():(S.screen==='profile'?scrProfile():(S.screen==='genopts'?scrGenOptions():(S.screen==='charges'?scrCharges():(S.screen==='calendar'?scrCalendar():(S.screen==='coach'?scrCoach():(S.screen==='coachDetail'?scrCoachDetail():(S.screen==='nutrition'?scrNutrition():(S.screen==='runs'?scrRuns():(S.screen==='badges'?scrBadges():(S.screen==='feedback'?scrFeedback():scrDash())))))))))));
   }
   sc.innerHTML=html; sc.scrollTop=0; S.msg=null;
   const e=document.getElementById('i-email'); if(e) e.addEventListener('keydown',ev=>{if(ev.key==='Enter')document.getElementById('i-pass').focus();});
