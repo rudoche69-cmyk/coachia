@@ -68,7 +68,7 @@
 const SUPABASE_URL = "https://irhmrbmanojkxwmxdlcn.supabase.co";
 const SUPABASE_KEY = "sb_publishable_ko2fXJQyKTgH5lEyd_C2yg_lhIR01YS";
 const FN_GENERATE = "generate-workout-ts";
-const FN_NUTRITION = "generate-nutrition";
+const FN_NUTRITION = "generate-nutrition-ts";
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 if ('serviceWorker' in navigator) { window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); }); }
 
