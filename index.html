@@ -75,7 +75,7 @@ const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 if ('serviceWorker' in navigator) { window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); }); }
 try{ var __th=localStorage.getItem('coachia-theme'); if(__th) document.documentElement.setAttribute('data-theme',__th); }catch(e){}
 
-const S = { screen:'login', user:null, profile:null, todayCheckin:null, todayScore:null, weights:[], lifts:[], chargeExo:null, history:[], athletes:[], selAthlete:null, selWeights:[], nutrition:null, meals:[], genNut:false, runs:[], checkinCount:0, comps:[], chat:[], aiThinking:false, report:null, reportLoading:false, runPlan:null, selRun:null, workout:null, exercises:[], started:false, generating:false, msg:null };
+const S = { screen:'login', user:null, profile:null, todayCheckin:null, todayScore:null, weights:[], lifts:[], chargeExo:null, history:[], athletes:[], selAthlete:null, selAthleteProfile:null, coachBusy:false, selWeights:[], nutrition:null, meals:[], genNut:false, runs:[], checkinCount:0, comps:[], chat:[], aiThinking:false, report:null, reportLoading:false, runPlan:null, selRun:null, workout:null, exercises:[], started:false, generating:false, msg:null };
 const today = () => new Date().toISOString().slice(0,10);
 
 function computeScore(c){
@@ -302,16 +302,19 @@ async function openWorkout(id){
 function scrCoach(){
   var a=S.athletes||[];
   var tb='<div class="tbar"><button class="ic" onclick="go(\'dash\')"><i class="ti ti-chevron-left"></i></button><h2 style="font-size:19px">Mes athlètes</h2><span style="width:38px"></span></div>';
+  var msg=S.msg?'<div class="msg '+S.msg.k+'">'+S.msg.t+'</div>':'';
+  var createBtn='<button class="btn" onclick="go(\'newathlete\')" style="margin-bottom:13px"><i class="ti ti-user-plus"></i> Créer un compte athlète</button>';
   function lv(x){ return x&&x.score?x.score.level:null; }
-  if(!a.length) return tb+'<div class="card flat" style="text-align:center;padding:26px 16px"><i class="ti ti-users" style="font-size:34px;color:var(--faint)"></i><div style="font-weight:700;margin:10px 0 4px">Aucun athlète</div><div class="sub">Crée des comptes athlètes dans Supabase (Authentication → Add user). Ils apparaîtront ici avec leur score de forme.</div></div>';
+  if(!a.length) return tb+msg+createBtn+'<div class="card flat" style="text-align:center;padding:26px 16px"><i class="ti ti-users" style="font-size:34px;color:var(--faint)"></i><div style="font-weight:700;margin:10px 0 4px">Aucun athlète</div><div class="sub">Crée le compte d\'un athlète avec le bouton ci-dessus : il apparaîtra ici avec son score de forme.</div></div>';
   var g=a.filter(function(x){return lv(x)==='vert';}).length,o=a.filter(function(x){return lv(x)==='orange';}).length,r=a.filter(function(x){return lv(x)==='rouge';}).length;
   var counts='<div class="row" style="gap:8px;margin-bottom:12px"><div class="card flat" style="flex:1;margin:0;text-align:center;padding:11px"><div class="big" style="font-size:21px;color:var(--green)">'+g+'</div><div class="label">Au vert</div></div><div class="card flat" style="flex:1;margin:0;text-align:center;padding:11px"><div class="big" style="font-size:21px;color:var(--amber)">'+o+'</div><div class="label">Vigilance</div></div><div class="card flat" style="flex:1;margin:0;text-align:center;padding:11px"><div class="big" style="font-size:21px;color:var(--red)">'+r+'</div><div class="label">À risque</div></div></div>';
   var rows=a.map(function(x){ var l=lv(x); var dot=l?'<span class="dot '+(l==='vert'?'g':(l==='orange'?'o':'r'))+'"></span>':'<span class="sub" style="font-size:11px">—</span>'; var init=((x.first_name||'?').charAt(0)||'?').toUpperCase(); return '<div class="ath" onclick="openAthlete(\''+x.id+'\')" style="cursor:pointer"><div class="av">'+esc(init)+'</div><div class="m"><div class="nm">'+esc(((x.first_name||'')+' '+(x.last_name||'')).trim()||'Athlète')+'</div><div class="ds">'+esc(x.main_goal||'Objectif non défini')+'</div></div>'+dot+'</div>'; }).join('');
-  return tb+counts+'<div class="card" style="padding:4px 14px">'+rows+'</div>';
+  return tb+msg+createBtn+counts+'<div class="card" style="padding:4px 14px">'+rows+'</div>';
 }
 async function openAthlete(id){
-  S.selAthlete=null;
+  S.selAthlete=null; S.selAthleteProfile=null;
   for(var i=0;i<S.athletes.length;i++){ if(S.athletes[i].id===id){ S.selAthlete=S.athletes[i]; break; } }
+  try{ var pr=await db.from('profiles').select('*').eq('id',id).maybeSingle(); S.selAthleteProfile=pr.data||null; }catch(_){ S.selAthleteProfile=null; }
   try{ var wr=await db.from('daily_checkins').select('date,weight').eq('athlete_id',id).not('weight','is',null).order('date',{ascending:true}).limit(30); S.selWeights=wr.data||[]; }catch(_){ S.selWeights=[]; }
   S.screen='coachDetail'; render();
 }
@@ -323,7 +326,77 @@ function scrCoachDetail(){
   var pill=l?'<span class="pill '+(l==='vert'?'g':(l==='orange'?'o':'r'))+'">'+(l==='vert'?'Au vert':(l==='orange'?'Vigilance':'À risque'))+'</span>':'<span class="sub">Pas de check-in</span>';
   var head='<div class="card" style="display:flex;gap:13px;align-items:center"><div class="av" style="width:48px;height:48px;font-size:16px">'+esc(((x.first_name||'?').charAt(0)||'?').toUpperCase())+'</div><div style="flex:1"><div style="font-weight:700;font-size:15px">'+nm+'</div><div class="sub">'+esc(x.main_goal||'Objectif non défini')+'</div></div>'+pill+'</div>';
   var wt=(S.selWeights&&S.selWeights.length>=2)?'<div class="card"><div class="label" style="margin-bottom:6px">Évolution du poids</div>'+weightSVG(S.selWeights)+'</div>':'<div class="card flat"><div class="sub">Pas encore assez de pesées pour cet athlète.</div></div>';
-  return tb+head+wt;
+  var msg=S.msg?'<div class="msg '+S.msg.k+'">'+S.msg.t+'</div>':'';
+  var ap=S.selAthleteProfile||{};
+  var info='<div class="card"><div class="label" style="margin-bottom:6px">Objectif & profil</div><div class="sub" style="color:var(--ink)"><b>Objectif :</b> '+esc(ap.main_goal||'non défini')+'<br><b>Niveau :</b> '+esc(ap.sport_level||'non défini')+'<br><b>Matériel :</b> '+esc(ap.available_equipment||'non défini')+'</div></div>';
+  var busy=S.coachBusy?'<div class="banner" style="background:var(--accent-soft)"><div class="spin" style="border-color:var(--accent);border-top-color:transparent"></div><div class="x" style="color:#1742a5">Génération en cours… quelques secondes.</div></div>':'';
+  var actions='<button class="btn" onclick="doGenForAthlete(\'workout\')"'+(S.coachBusy?' disabled':'')+'><i class="ti ti-sparkles"></i> Générer sa séance du jour</button>'+
+    '<button class="btn ghost" style="margin-top:9px" onclick="doGenForAthlete(\'nutrition\')"'+(S.coachBusy?' disabled':'')+'><i class="ti ti-salad"></i> Générer sa nutrition</button>'+
+    '<button class="btn outline" style="margin-top:9px" onclick="go(\'athleteEdit\')"><i class="ti ti-edit"></i> Modifier son profil / objectif</button>';
+  return tb+msg+head+info+wt+busy+actions;
+}
+async function doGenForAthlete(kind){
+  if(!S.selAthlete){ return; }
+  var id=S.selAthlete.id;
+  S.coachBusy=true; render();
+  var fn=kind==='nutrition'?'generate-nutrition':'generate-workout';
+  try{
+    var r=await invokeFn(fn,{athlete_id:id});
+    S.coachBusy=false;
+    if(r.error||(r.data&&r.data.error)){ var d=(r.data&&r.data.error)||(r.error&&r.error.message)||'erreur'; S.msg={k:'err',t:'Génération impossible : '+d}; render(); return; }
+    var who=(S.selAthlete.first_name)||'l\'athlète';
+    S.msg={k:'ok',t:(kind==='nutrition'?'Nutrition générée pour ':'Séance générée pour ')+who+' ✅ (visible dans son espace)'}; render();
+  }catch(e){ S.coachBusy=false; S.msg={k:'err',t:'Erreur : '+(e.message||e)}; render(); }
+}
+function scrNewAthlete(){
+  var tb='<div class="tbar"><button class="ic" onclick="go(\'coach\')"><i class="ti ti-chevron-left"></i></button><h2 style="font-size:19px">Créer un athlète</h2><span style="width:38px"></span></div>';
+  var msg=S.msg?'<div class="msg '+S.msg.k+'">'+S.msg.t+'</div>':'';
+  return tb+msg+'<div class="banner" style="background:var(--accent-soft)"><i class="ti ti-info-circle" style="color:var(--accent)"></i><div class="x" style="color:#1742a5">Le compte est créé immédiatement. Transmets l\'e-mail et le mot de passe provisoire à ton athlète : il pourra se connecter et le changer ensuite.</div></div>'+
+    inField('na-first','Prénom',null,'text','Prénom')+
+    inField('na-last','Nom',null,'text','Nom (optionnel)')+
+    inField('na-email','E-mail',null,'email','athlete@exemple.fr')+
+    inField('na-pass','Mot de passe provisoire',null,'text','au moins 6 caractères')+
+    '<button class="btn" id="b-na" onclick="doCreateAthlete()"><i class="ti ti-user-plus"></i> Créer le compte</button>';
+}
+async function doCreateAthlete(){
+  var g=function(id){var e=document.getElementById(id);return e?e.value.trim():'';};
+  var first=g('na-first'), last=g('na-last'), email=g('na-email'), pass=g('na-pass');
+  if(!email||!pass){ S.msg={k:'err',t:'E-mail et mot de passe sont obligatoires.'}; render(); return; }
+  if(pass.length<6){ S.msg={k:'err',t:'Le mot de passe doit faire au moins 6 caractères.'}; render(); return; }
+  var btn=document.getElementById('b-na'); if(btn){ btn.disabled=true; btn.innerHTML='<span class="spin"></span>'; }
+  try{
+    var r=await invokeFn('admin-create-athlete',{email:email,password:pass,first_name:first,last_name:last});
+    if(r.error||(r.data&&r.data.error)){ var d=(r.data&&r.data.error)||(r.error&&r.error.message)||'erreur'; S.msg={k:'err',t:'Création impossible : '+d}; render(); return; }
+    await loadAll(); S.msg={k:'ok',t:'Compte créé ✅ À transmettre — e-mail : '+email+' · mot de passe : '+pass}; S.screen='coach'; render();
+  }catch(e){ S.msg={k:'err',t:'Erreur : '+(e.message||e)}; render(); }
+}
+function scrAthleteEdit(){
+  var p=S.selAthleteProfile||{};
+  var nm=esc(((p.first_name||'')+' '+(p.last_name||'')).trim()||'athlète');
+  var tb='<div class="tbar"><button class="ic" onclick="go(\'coachDetail\')"><i class="ti ti-chevron-left"></i></button><h2 style="font-size:18px">Profil de '+nm+'</h2><span style="width:38px"></span></div>';
+  var msg=S.msg?'<div class="msg '+S.msg.k+'">'+S.msg.t+'</div>':'';
+  var goals=['Hyrox Solo','Hyrox Double','Football','Running','Courir plus vite','Trail','Marathon','Semi-marathon','Spartan Race','Cross Training','Musculation','Force','Hypertrophie','Explosivité','Perte de poids','Recomposition corporelle','Prise de masse','Prise de masse musculaire','Santé','Réathlétisation','Retour de blessure','Préparation concours','Préparation militaire'].map(function(x){return [x,x];});
+  return tb+msg+
+    inField('ae-first','Prénom',p.first_name,'text','Prénom')+
+    selField('ae-goal','Objectif principal',p.main_goal,goals)+
+    selField('ae-level','Niveau',p.sport_level,[['debutant','Débutant'],['intermediaire','Intermédiaire'],['avance','Avancé'],['expert','Expert']])+
+    selField('ae-equip','Matériel disponible',p.available_equipment,[['Salle de sport complète','Salle de sport complète'],['Salle de sport (basique)','Salle de sport (basique)'],['Matériel maison (haltères/barre)','Matériel maison (haltères/barre)'],['Petit matériel (élastiques, kettlebell)','Petit matériel (élastiques, kettlebell)'],['Sans matériel (poids du corps)','Sans matériel (poids du corps)']])+
+    inField('ae-dur','Durée par séance (min)',p.session_duration_min,'number','60')+
+    inField('ae-injuries','Blessures / restrictions',p.injuries_current,'text','Aucune, genou droit…')+
+    '<button class="btn" id="b-ae" onclick="doSaveAthleteProfile()"><i class="ti ti-check"></i> Enregistrer</button>';
+}
+async function doSaveAthleteProfile(){
+  if(!S.selAthlete) return;
+  var g=function(id){var e=document.getElementById(id);return e?e.value.trim():'';};
+  var upd={ first_name:g('ae-first')||null, main_goal:g('ae-goal')||null, sport_level:g('ae-level')||null, available_equipment:g('ae-equip')||null, session_duration_min:parseInt(g('ae-dur'))||null, injuries_current:g('ae-injuries')||null };
+  var btn=document.getElementById('b-ae'); if(btn){ btn.disabled=true; btn.innerHTML='<span class="spin"></span>'; }
+  try{
+    var r=await db.from('profiles').update(upd).eq('id',S.selAthlete.id);
+    if(r.error){ S.msg={k:'err',t:'Erreur : '+r.error.message}; render(); return; }
+    try{ var pr=await db.from('profiles').select('*').eq('id',S.selAthlete.id).maybeSingle(); S.selAthleteProfile=pr.data||S.selAthleteProfile; }catch(_){}
+    if(S.selAthlete){ S.selAthlete.main_goal=upd.main_goal; }
+    S.msg={k:'ok',t:'Profil de l\'athlète enregistré.'}; S.screen='coachDetail'; render();
+  }catch(e){ S.msg={k:'err',t:'Erreur : '+(e.message||e)}; render(); }
 }
 function scrNutrition(){
   var tb='<div class="tbar"><div><div class="t">Jour ON · entraînement</div><h2>Nutrition</h2></div><span style="width:38px"></span></div>';
@@ -645,7 +718,7 @@ function render(extra){
   if(S.screen==='login'){ html=scrLogin(); nav.style.display='none'; }
   else if(S.screen==='result'){ html=scrResult(extra); nav.style.display='flex'; nav.innerHTML=navBar(); }
   else { nav.style.display='flex'; nav.innerHTML=navBar();
-    html = S.screen==='checkin'?scrCheckin():(S.screen==='workout'?scrWorkout():(S.screen==='profile'?scrProfile():(S.screen==='genopts'?scrGenOptions():(S.screen==='charges'?scrCharges():(S.screen==='calendar'?scrCalendar():(S.screen==='coach'?scrCoach():(S.screen==='coachDetail'?scrCoachDetail():(S.screen==='nutrition'?scrNutrition():(S.screen==='runs'?scrRuns():(S.screen==='badges'?scrBadges():(S.screen==='feedback'?scrFeedback():(S.screen==='comps'?scrComps():(S.screen==='assistant'?scrAssistant():(S.screen==='report'?scrReport():(S.screen==='runplanopts'?scrRunPlanOpts():(S.screen==='runsession'?scrRunSession():scrDash()))))))))))))))));
+    html = S.screen==='checkin'?scrCheckin():(S.screen==='workout'?scrWorkout():(S.screen==='profile'?scrProfile():(S.screen==='genopts'?scrGenOptions():(S.screen==='charges'?scrCharges():(S.screen==='calendar'?scrCalendar():(S.screen==='coach'?scrCoach():(S.screen==='coachDetail'?scrCoachDetail():(S.screen==='nutrition'?scrNutrition():(S.screen==='runs'?scrRuns():(S.screen==='badges'?scrBadges():(S.screen==='feedback'?scrFeedback():(S.screen==='comps'?scrComps():(S.screen==='assistant'?scrAssistant():(S.screen==='report'?scrReport():(S.screen==='runplanopts'?scrRunPlanOpts():(S.screen==='runsession'?scrRunSession():(S.screen==='newathlete'?scrNewAthlete():(S.screen==='athleteEdit'?scrAthleteEdit():scrDash()))))))))))))))))));
   }
   sc.innerHTML=html; sc.scrollTop=0; S.msg=null;
   const e=document.getElementById('i-email'); if(e) e.addEventListener('keydown',ev=>{if(ev.key==='Enter')document.getElementById('i-pass').focus();});
