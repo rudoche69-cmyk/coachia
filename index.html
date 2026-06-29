@@ -43,7 +43,7 @@
   .seg button{flex:1;text-align:center;font:inherit;font-size:12px;font-weight:700;color:var(--muted);padding:8px;border-radius:9px;border:none;background:none;cursor:pointer} .seg button.on{background:var(--card);color:var(--ink)}
   .banner{border-radius:13px;padding:13px;margin-bottom:13px;display:flex;gap:10px;align-items:flex-start} .banner i{font-size:19px;margin-top:1px} .banner .x{font-size:13px;line-height:1.5}
   .nav{position:sticky;bottom:0;height:64px;border-top:1px solid var(--line);display:flex;align-items:center;justify-content:space-around;background:var(--card)}
-  .nav button{border:none;background:none;font-size:23px;color:var(--faint);cursor:pointer;padding:8px} .nav button.on{color:var(--accent)}
+  .nav button{border:none;background:none;font-size:11px;color:var(--faint);cursor:pointer;padding:6px 4px} .nav button.on{color:var(--accent)}
   .msg{font-size:13px;padding:11px 13px;border-radius:11px;margin-bottom:12px} .msg.err{background:var(--red-bg);color:#9b2c2c} .msg.ok{background:var(--green-bg);color:var(--green)}
   .spin{display:inline-block;width:18px;height:18px;border:2px solid #fff;border-top-color:transparent;border-radius:50%;animation:sp 0.7s linear infinite}@keyframes sp{to{transform:rotate(360deg)}}
   .center{min-height:100vh;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:14px;color:var(--muted)}
@@ -340,8 +340,8 @@ async function doGenNutrition(){
   }catch(e){ S.genNut=false; S.msg={k:'err',t:'Erreur : '+(e.message||e)}; render(); }
 }
 function navBar(){
-  const b=(ic,t)=>'<button class="'+(S.screen===t?'on':'')+'" onclick="go(\''+t+'\')"><i class="ti '+ic+'"></i></button>';
-  return b('ti-home','dash')+b('ti-barbell','workout')+b('ti-salad','nutrition')+b('ti-circle-plus','checkin')+b('ti-calendar','calendar');
+  const b=(ic,t)=>'<button class="'+(S.screen===t?'on':'')+'" onclick="go(\''+t+'\')" style="font-size:11px;font-weight:700;color:inherit;letter-spacing:.02em">'+ic+'</button>';
+  return b('Accueil','dash')+b('Séance','workout')+b('Nutrition','nutrition')+b('Check-in','checkin')+b('Agenda','calendar');
 }
 function render(extra){
   const sc=document.getElementById('screen'), nav=document.getElementById('nav');
