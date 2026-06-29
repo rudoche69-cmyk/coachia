@@ -75,7 +75,7 @@ const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 if ('serviceWorker' in navigator) { window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); }); }
 try{ var __th=localStorage.getItem('coachia-theme'); if(__th) document.documentElement.setAttribute('data-theme',__th); }catch(e){}
 
-const S = { screen:'login', user:null, profile:null, todayCheckin:null, todayScore:null, weights:[], lifts:[], chargeExo:null, history:[], athletes:[], selAthlete:null, selWeights:[], nutrition:null, meals:[], genNut:false, runs:[], checkinCount:0, comps:[], chat:[], aiThinking:false, report:null, reportLoading:false, workout:null, exercises:[], started:false, generating:false, msg:null };
+const S = { screen:'login', user:null, profile:null, todayCheckin:null, todayScore:null, weights:[], lifts:[], chargeExo:null, history:[], athletes:[], selAthlete:null, selWeights:[], nutrition:null, meals:[], genNut:false, runs:[], checkinCount:0, comps:[], chat:[], aiThinking:false, report:null, reportLoading:false, runPlan:null, selRun:null, workout:null, exercises:[], started:false, generating:false, msg:null };
 const today = () => new Date().toISOString().slice(0,10);
 
 function computeScore(c){
@@ -104,6 +104,7 @@ async function loadAll(){
   const uid = S.user.id;
   const { data:prof } = await db.from('profiles').select('*').eq('id', uid).maybeSingle();
   S.profile = prof;
+  S.runPlan = (prof && prof.run_plan) || null;
   const { data:ci } = await db.from('daily_checkins').select('*').eq('athlete_id', uid).eq('date', today()).maybeSingle();
   S.todayCheckin = ci;
   const { data:sc } = await db.from('fitness_scores').select('*').eq('athlete_id', uid).eq('date', today()).maybeSingle();
@@ -281,15 +282,17 @@ async function doSaveLoads(){
 }
 function scrCalendar(){
   var h=S.history||[];
-  var tb='<div class="tbar"><button class="ic" onclick="go(\'dash\')"><i class="ti ti-chevron-left"></i></button><h2 style="font-size:19px">Calendrier des séances</h2><span style="width:38px"></span></div>';
-  if(!h.length) return tb+'<div class="card flat" style="text-align:center;padding:26px 16px"><i class="ti ti-calendar" style="font-size:34px;color:var(--faint)"></i><div style="font-weight:700;margin:10px 0 4px">Aucune séance</div><div class="sub">Génère ta première séance pour la voir apparaître ici.</div></div>';
+  var tb='<div class="tbar"><button class="ic" onclick="go(\'dash\')"><i class="ti ti-chevron-left"></i></button><h2 style="font-size:19px">Calendrier</h2><span style="width:38px"></span></div>';
+  var planCard=runUpcomingCard();
+  if(!h.length && !planCard) return tb+'<div class="card flat" style="text-align:center;padding:26px 16px"><i class="ti ti-calendar" style="font-size:34px;color:var(--faint)"></i><div style="font-weight:700;margin:10px 0 4px">Aucune séance</div><div class="sub">Génère ta première séance, ou crée un plan course, pour les voir apparaître ici.</div></div>';
   var rows=h.map(function(w){
     var d=new Date((w.date||'')+'T00:00:00');
     var ds=isNaN(d)?(w.date||''):d.toLocaleDateString('fr-FR',{weekday:'short',day:'numeric',month:'short'});
     var badge=w.status==='realisee'?'<span class="pill g">Faite</span>':(w.status==='manquee'?'<span class="pill r">Manquée</span>':'<span class="pill o">Prévue</span>');
     return '<div class="ex" onclick="openWorkout(\''+w.id+'\')" style="cursor:pointer"><div class="n"><i class="ti ti-barbell"></i></div><div class="m"><div class="nm">'+esc(w.type||'Séance')+'</div><div class="ds">'+ds+(w.estimated_duration?' · '+w.estimated_duration+' min':'')+'</div></div>'+badge+'</div>';
   }).join('');
-  return tb+'<div class="card" style="padding:6px 14px">'+rows+'</div>';
+  var wkCard=h.length?('<div class="label" style="margin:6px 2px 8px">Séances de muscu / cross</div><div class="card" style="padding:6px 14px">'+rows+'</div>'):'';
+  return tb+planCard+wkCard;
 }
 async function openWorkout(id){
   try{ var fr=await db.from('workouts').select('*').eq('id',id).maybeSingle(); if(fr.data) S.workout=fr.data; }catch(_){}
@@ -347,14 +350,33 @@ async function doGenNutrition(){
 }
 function menuCard(label,target){ return '<div class="card" onclick="go(\''+target+'\')" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between"><span style="font-weight:700">'+label+'</span><span style="color:var(--faint);font-size:18px">›</span></div>'; }
 function scrRuns(){
-  var runs=S.runs||[];
-  var total=Math.round(runs.reduce(function(a,r){return a+(Number(r.distance_km)||0);},0)*10)/10;
   var tb='<div class="tbar"><button class="ic" onclick="go(\'dash\')"><i class="ti ti-chevron-left"></i></button><h2 style="font-size:19px">Sorties course</h2><span style="width:38px"></span></div>';
   var msg=S.msg?'<div class="msg '+S.msg.k+'">'+S.msg.t+'</div>':'';
+  if(!S.runPlan){
+    var intro='<div class="card"><div style="font-weight:700;margin-bottom:4px">Mon plan course 🏃</div><div class="sub" style="margin-bottom:12px">Un programme progressif, semaine par semaine, où chaque séance est détaillée pas à pas (échauffement, déroulé, conseils). Parfait pour débuter sans se blesser.</div><button class="btn" onclick="go(\'runplanopts\')">Créer mon plan course</button></div>';
+    return tb+msg+intro+runGlossaryCard()+runManualSection();
+  }
+  var pr=runProgress(); var cw=currentRunWeek();
+  var pct=pr.total?Math.round(pr.done/pr.total*100):0;
+  var headCard='<div class="card"><div class="row" style="margin-bottom:6px"><div class="label">'+esc(runGoalLabel(S.runPlan.goal))+'</div><span class="pill o">'+S.runPlan.perWeek+'×/sem</span></div><div class="row"><span class="sub">Progression</span><span class="sub" style="font-weight:700;color:var(--ink)">'+pr.done+' / '+pr.total+' séances</span></div><div style="height:8px;border-radius:999px;background:var(--bg);margin-top:8px;overflow:hidden"><i style="display:block;height:100%;width:'+pct+'%;background:var(--accent)"></i></div></div>';
+  var weeksHtml=S.runPlan.weeks.map(function(w,wi){
+    var cur=wi===cw;
+    var rows=w.sessions.map(function(s,si){
+      var d=new Date(s.date+'T00:00:00'); var ds=isNaN(d)?s.date:d.toLocaleDateString('fr-FR',{weekday:'short',day:'numeric',month:'short'});
+      var check=s.done?'<i class="ti ti-circle-check" style="color:var(--green);font-size:20px"></i>':'<i class="ti ti-chevron-right" style="color:var(--faint);font-size:18px"></i>';
+      return '<div class="ex" onclick="openRunSession('+wi+','+si+')" style="cursor:pointer"><div class="n" style="background:'+runTypeBg(s.t)+';color:'+runTypeCol(s.t)+'"><i class="ti ti-run"></i></div><div class="m"><div class="nm">'+ds+' · '+runTypeLabel(s.t)+'</div><div class="ds">'+esc(s.m)+'</div></div>'+check+'</div>';
+    }).join('');
+    return '<div class="card" style="padding:4px 14px'+(cur?';border:2px solid var(--accent)':'')+'"><div class="row" style="padding:10px 0 4px"><div class="label">Semaine '+w.n+' · '+esc(w.f)+'</div>'+(cur?'<span class="pill o">En cours</span>':'')+'</div>'+rows+'</div>';
+  }).join('');
+  return tb+msg+headCard+'<div class="label" style="margin:6px 2px 8px">Mon planning</div>'+weeksHtml+'<button class="btn outline" onclick="doResetRunPlan()" style="margin-bottom:14px"><i class="ti ti-refresh"></i> Recréer un nouveau plan</button>'+runGlossaryCard()+runManualSection();
+}
+function runManualSection(){
+  var runs=S.runs||[];
+  var total=Math.round(runs.reduce(function(a,r){return a+(Number(r.distance_km)||0);},0)*10)/10;
   var stat='<div class="row" style="gap:8px;margin-bottom:12px"><div class="card flat" style="flex:1;margin:0;text-align:center;padding:11px"><div class="label">Sorties</div><div class="big" style="font-size:20px;margin-top:3px">'+runs.length+'</div></div><div class="card flat" style="flex:1;margin:0;text-align:center;padding:11px"><div class="label">Total</div><div class="big" style="font-size:20px;margin-top:3px">'+total+' km</div></div></div>';
-  var form='<div class="card"><div class="flabel">Ajouter une sortie</div><div class="row" style="gap:8px;margin-top:7px"><input id="run-km" class="in" type="number" step="0.1" placeholder="Distance (km)" style="margin-top:0"><input id="run-min" class="in" type="number" step="1" placeholder="Durée (min)" style="margin-top:0"></div><input id="run-note" class="in" type="text" placeholder="Ressenti / notes (optionnel)"><button class="btn" onclick="doSaveRun()" style="margin-top:10px">Enregistrer la sortie</button></div>';
+  var form='<div class="card"><div class="flabel">Noter une sortie libre</div><div class="row" style="gap:8px;margin-top:7px"><input id="run-km" class="in" type="number" step="0.1" placeholder="Distance (km)" style="margin-top:0"><input id="run-min" class="in" type="number" step="1" placeholder="Durée (min)" style="margin-top:0"></div><input id="run-note" class="in" type="text" placeholder="Ressenti / notes (optionnel)"><button class="btn" onclick="doSaveRun()" style="margin-top:10px">Enregistrer la sortie</button></div>';
   var list=runs.length?('<div class="card" style="padding:6px 14px">'+runs.map(function(r){var km=Number(r.distance_km)||0;var mn=Number(r.duration_min)||0;var pace=(km>0&&mn>0)?(mn/km):0;var ps=pace?(Math.floor(pace)+':'+('0'+Math.round((pace%1)*60)).slice(-2)+' /km'):'';var d=new Date((r.date||'')+'T00:00:00');var ds=isNaN(d)?(r.date||''):d.toLocaleDateString('fr-FR',{day:'numeric',month:'short'});return '<div class="ex"><div class="n"><i class="ti ti-run"></i></div><div class="m"><div class="nm">'+km+' km'+(mn?' · '+mn+' min':'')+'</div><div class="ds">'+ds+(ps?' · '+ps:'')+(r.notes?' · '+esc(r.notes):'')+'</div></div></div>';}).join('')+'</div>'):'';
-  return tb+msg+stat+form+list;
+  return '<div class="label" style="margin:6px 2px 8px">Journal de mes sorties</div>'+stat+form+list;
 }
 async function doSaveRun(){
   var km=parseFloat(document.getElementById('run-km').value)||null;
@@ -469,6 +491,150 @@ async function doReport(){
   catch(e){ S.report='Erreur : '+(e.message||e); }
   S.reportLoading=false; render();
 }
+/* ===== PLAN COURSE (progressif, guidé pas à pas) ===== */
+function runTypeLabel(t){ return ({EF:'Endurance fondamentale',FRAC:'Fractionné',LONG:'Sortie longue',RECUP:'Récupération',MC:'Marche / course'})[t]||'Sortie'; }
+function runTypeBg(t){ return t==='FRAC'?'var(--amber-bg)':(t==='LONG'?'var(--green-bg)':(t==='RECUP'?'var(--green-bg)':'var(--accent-soft)')); }
+function runTypeCol(t){ return t==='FRAC'?'var(--amber)':(t==='LONG'?'var(--green)':(t==='RECUP'?'var(--green)':'var(--accent)')); }
+function runSessionBase(t){
+  var b={
+    EF:{wu:'5 min de marche rapide, puis 5 min de footing très lent. Termine par 3 montées de genoux et 3 talons-fesses.',cd:'5 min de marche + étirements doux (mollets, cuisses, ischios).',tip:'Allure « test de la parole » : tu dois pouvoir tenir une conversation en courant. Si tu es essoufflé, ralentis ou marche un peu, c’est normal.'},
+    FRAC:{wu:'10 min de footing lent, puis 3 accélérations progressives de 20 s (récupération en marchant entre chaque).',cd:'8 à 10 min de footing très lent, puis étirements.',tip:'Les portions rapides = vite mais maîtrisé (≈ 8/10 d’effort), surtout pas un sprint. Récupère vraiment entre chaque (marche ou footing très lent).'},
+    LONG:{wu:'5 min de marche rapide, puis pars TRÈS lentement.',cd:'5 min de marche + étirements, et bois bien.',tip:'C’est la sortie la plus longue de la semaine : reste très lent du début à la fin. Le but, c’est la durée — pas la vitesse.'},
+    RECUP:{wu:'Pars directement, très lentement.',cd:'Étirements légers.',tip:'Footing de récupération : ultra léger, juste pour faire tourner les jambes sans fatigue.'},
+    MC:{wu:'5 min de marche rapide pour t’échauffer, avec quelques cercles de bras et montées de genoux.',cd:'5 min de marche lente + étirements mollets et cuisses.',tip:'Cours LENTEMENT pendant les phases de course (tu dois pouvoir parler). Marche franchement pour récupérer. Objectif : finir sans être épuisé, pas aller vite.'}
+  };
+  return b[t]||b.EF;
+}
+function runGoals(){ return [
+  {k:'debut5k',label:'Débuter la course (0 à 5 km)',weeks:8},
+  {k:'dix',label:'Courir 10 km',weeks:8},
+  {k:'vite',label:'Courir plus vite',weeks:6},
+  {k:'reprise',label:'Reprise en douceur',weeks:6}
+];}
+function runGoalLabel(k){ var g=runGoals().filter(function(x){return x.k===k;})[0]; return g?g.label:'Plan course'; }
+function runWeekPlan(k){
+  if(k==='debut5k') return [
+    {f:'Découverte',p:[{t:'MC',m:'6 × (1 min de course lente + 1 min 30 de marche). Total ≈ 20 min.'}]},
+    {f:'On enchaîne',p:[{t:'MC',m:'6 × (1 min 30 de course + 1 min 30 de marche).'}]},
+    {f:'Progression',p:[{t:'MC',m:'6 × (2 min de course + 1 min 30 de marche).'}]},
+    {f:'On allonge',p:[{t:'MC',m:'5 × (3 min de course + 1 min 30 de marche).'}]},
+    {f:'Cap des 5 minutes',p:[{t:'MC',m:'4 × (5 min de course + 2 min de marche).'}]},
+    {f:'Endurance',p:[{t:'MC',m:'3 × (8 min de course + 2 min de marche).'}]},
+    {f:'Presque continu',p:[{t:'MC',m:'2 × (12 min de course + 2 min de marche).'}]},
+    {f:'Objectif atteint !',p:[{t:'EF',m:'25 à 30 min de course continue, très lente. Tu cours sans t’arrêter, bravo ! 🎉'}]}
+  ];
+  if(k==='reprise') return [
+    {f:'Reprise tout en douceur',p:[{t:'MC',m:'8 × (1 min de course très lente + 2 min de marche).'}]},
+    {f:'On installe',p:[{t:'MC',m:'6 × (2 min de course + 2 min de marche).'}]},
+    {f:'Un peu plus',p:[{t:'MC',m:'5 × (3 min de course + 2 min de marche).'}]},
+    {f:'Vers le continu',p:[{t:'MC',m:'4 × (5 min de course + 2 min de marche).'}]},
+    {f:'Course continue',p:[{t:'EF',m:'20 min de course continue très lente.'}]},
+    {f:'Consolidation',p:[{t:'EF',m:'25 à 30 min de course continue très lente.'}]}
+  ];
+  if(k==='dix') return [
+    {f:'Mise en route',p:[{t:'EF',m:'30 min de footing lent.'},{t:'LONG',m:'40 min très lent.'},{t:'FRAC',m:'6 × (1 min vite / 1 min 30 lent).'}]},
+    {f:'Volume',p:[{t:'EF',m:'35 min de footing lent.'},{t:'LONG',m:'45 min très lent.'},{t:'FRAC',m:'7 × (1 min vite / 1 min 30 lent).'}]},
+    {f:'On structure',p:[{t:'EF',m:'35 min de footing lent.'},{t:'LONG',m:'50 min très lent.'},{t:'FRAC',m:'8 × (1 min vite / 1 min lent).'}]},
+    {f:'Endurance',p:[{t:'EF',m:'40 min de footing lent.'},{t:'LONG',m:'55 min très lent.'},{t:'FRAC',m:'6 × (2 min vite / 1 min 30 lent).'}]},
+    {f:'Pic de volume',p:[{t:'EF',m:'40 min de footing lent.'},{t:'LONG',m:'60 min (≈ 8-9 km) très lent.'},{t:'FRAC',m:'5 × (3 min vite / 2 min lent).'}]},
+    {f:'Spécifique 10 km',p:[{t:'EF',m:'40 min de footing lent.'},{t:'LONG',m:'65 min très lent.'},{t:'FRAC',m:'6 × (2 min à allure 10 km / 1 min 30 lent).'}]},
+    {f:'Allègement',p:[{t:'EF',m:'30 min de footing lent.'},{t:'LONG',m:'45 min très lent.'},{t:'FRAC',m:'8 × (400 m vite / 1 min 30 récup en marchant).'}]},
+    {f:'Semaine de course',p:[{t:'EF',m:'25 min de footing très léger.'},{t:'RECUP',m:'20 min de footing souple, 2 jours avant la course.'},{t:'LONG',m:'COURSE : 10 km 🎉 (ou sortie test de 60-70 min).'}]}
+  ];
+  if(k==='vite') return [
+    {f:'Réveil de la vitesse',p:[{t:'FRAC',m:'8 × (30 s vite / 30 s très lent).'},{t:'EF',m:'30 min de footing lent.'},{t:'FRAC',m:'10 × (200 m vite / 200 m marche).'}]},
+    {f:'On répète',p:[{t:'FRAC',m:'10 × (30 s vite / 30 s lent).'},{t:'EF',m:'35 min de footing lent.'},{t:'FRAC',m:'6 × (1 min vite / 1 min 30 récup).'}]},
+    {f:'Plus long, plus fort',p:[{t:'FRAC',m:'6 × (1 min vite / 1 min récup).'},{t:'EF',m:'35 min de footing lent.'},{t:'FRAC',m:'5 × (2 min vite / 1 min 30 récup).'}]},
+    {f:'VMA',p:[{t:'FRAC',m:'8 × (45 s vite / 45 s lent).'},{t:'EF',m:'40 min de footing lent.'},{t:'FRAC',m:'5 × (3 min vite / 2 min récup).'}]},
+    {f:'Pic de forme',p:[{t:'FRAC',m:'12 × (30 s très vite / 30 s lent).'},{t:'EF',m:'35 min de footing lent.'},{t:'FRAC',m:'4 × (3 min vite / 2 min récup).'}]},
+    {f:'Test',p:[{t:'FRAC',m:'6 × (1 min vite / 1 min récup), léger.'},{t:'EF',m:'30 min de footing lent.'},{t:'LONG',m:'Test : cours 2 km le plus régulièrement possible et note ton temps.'}]}
+  ];
+  return [];
+}
+function runDayOffsets(n){ return n<=2?[0,3]:(n===3?[0,2,4]:(n>=4?[0,1,3,5]:[0,2,4])); }
+function addDays(dstr,n){ var d=new Date(dstr+'T00:00:00'); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); }
+function buildRunPlan(goalKey,perWeek,start){
+  var tmpl=runWeekPlan(goalKey); var weeks=[];
+  for(var w=0;w<tmpl.length;w++){
+    var pool=tmpl[w].p;
+    var isLast=(w===tmpl.length-1);
+    var count=(isLast&&pool.length>1)?pool.length:perWeek;
+    var offs=runDayOffsets(count); var sess=[];
+    for(var s=0;s<count;s++){
+      var src=pool[s % pool.length];
+      sess.push({id:'w'+(w+1)+'s'+(s+1), t:src.t, m:src.m, date:addDays(start, w*7+offs[s%offs.length]), done:false});
+    }
+    weeks.push({n:w+1, f:tmpl[w].f, sessions:sess});
+  }
+  return {goal:goalKey, perWeek:perWeek, start:start, weeks:weeks};
+}
+function runProgress(){ var p=S.runPlan; if(!p) return {done:0,total:0}; var d=0,t=0; p.weeks.forEach(function(w){w.sessions.forEach(function(s){t++; if(s.done)d++;});}); return {done:d,total:t}; }
+function currentRunWeek(){ var p=S.runPlan; if(!p) return 0; var td=today(); var idx=0; for(var i=0;i<p.weeks.length;i++){ idx=i; var ws=p.weeks[i].sessions; var last=ws[ws.length-1].date; if(td<=last) break; } return idx; }
+function runGlossaryCard(){
+  var items=[
+    ['Endurance fondamentale','La base de la course : allure lente où tu peux parler. Devrait représenter ~70 % de tes sorties. C’est elle qui construit ton « moteur ».'],
+    ['Fractionné (VMA)','Des portions rapides entrecoupées de récupération. Pour gagner en vitesse. 1 fois par semaine maximum.'],
+    ['Sortie longue','La plus longue sortie de la semaine, en allure tranquille. Développe l’endurance et le mental.'],
+    ['Récupération','Footing très léger et court, pour récupérer entre deux grosses séances.'],
+    ['Marche / course','Pour débuter : on alterne course lente et marche, le temps que le corps s’habitue, sans se blesser.'],
+    ['Le « test de la parole »','En endurance, tu dois pouvoir tenir une conversation. Si tu es essoufflé, ralentis ou marche. C’est normal, et ça progresse très vite !']
+  ];
+  var rows=items.map(function(it){return '<div style="padding:9px 0;border-bottom:1px solid var(--line)"><div style="font-weight:700;font-size:13px">'+it[0]+'</div><div class="sub" style="font-size:12px;margin-top:2px">'+it[1]+'</div></div>';}).join('');
+  return '<div class="card"><div class="label" style="margin-bottom:4px">Comprendre les types de séance</div>'+rows+'</div>';
+}
+function scrRunPlanOpts(){
+  var tb='<div class="tbar"><button class="ic" onclick="go(\'runs\')"><i class="ti ti-chevron-left"></i></button><h2 style="font-size:19px">Créer mon plan</h2><span style="width:38px"></span></div>';
+  var gopts=runGoals().map(function(g){return '<option value="'+g.k+'">'+esc(g.label)+' — '+g.weeks+' semaines</option>';}).join('');
+  return tb+'<div class="banner" style="background:var(--accent-soft)"><i class="ti ti-route" style="color:var(--accent)"></i><div class="x" style="color:#1742a5">Choisis ton objectif : on te crée un plan progressif, semaine par semaine. Chaque séance sera détaillée pas à pas — tu n’as qu’à suivre.</div></div>'+
+    '<div class="card"><div class="flabel">Mon objectif</div><select class="in" id="rp-goal">'+gopts+'</select></div>'+
+    '<div class="card"><div class="flabel">Combien de séances de course par semaine ?</div><select class="in" id="rp-week"><option value="2">2 par semaine</option><option value="3" selected>3 par semaine</option><option value="4">4 par semaine</option></select></div>'+
+    '<div class="card"><div class="flabel">Date de début</div><input id="rp-start" class="in" type="date" value="'+today()+'"></div>'+
+    '<button class="btn" onclick="doCreateRunPlan()"><i class="ti ti-sparkles"></i> Générer mon plan</button>';
+}
+async function doCreateRunPlan(){
+  var goal=document.getElementById('rp-goal').value;
+  var per=parseInt(document.getElementById('rp-week').value)||3;
+  var start=document.getElementById('rp-start').value||today();
+  var plan=buildRunPlan(goal,per,start);
+  try{ await db.from('profiles').update({run_plan:plan}).eq('id',S.user.id); S.runPlan=plan; if(S.profile)S.profile.run_plan=plan; S.msg={k:'ok',t:'Ton plan course est prêt ! Suis-le séance après séance.'}; }
+  catch(e){ S.msg={k:'err',t:'Erreur : '+(e.message||e)+' (la colonne run_plan a-t-elle été ajoutée dans Supabase ?)'}; }
+  S.screen='runs'; render();
+}
+async function doResetRunPlan(){
+  if(!confirm('Recréer un plan effacera le plan actuel et sa progression. Continuer ?')) return;
+  S.runPlan=null; if(S.profile)S.profile.run_plan=null;
+  try{ await db.from('profiles').update({run_plan:null}).eq('id',S.user.id); }catch(e){}
+  S.screen='runplanopts'; render();
+}
+function openRunSession(wi,si){ S.selRun={w:wi,s:si}; S.screen='runsession'; render(); }
+function scrRunSession(){
+  var sel=S.selRun; if(!sel||!S.runPlan) return scrRuns();
+  var w=S.runPlan.weeks[sel.w]; if(!w) return scrRuns(); var s=w.sessions[sel.s]; if(!s) return scrRuns();
+  var base=runSessionBase(s.t);
+  var d=new Date(s.date+'T00:00:00'); var ds=isNaN(d)?s.date:d.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'});
+  var tb='<div class="tbar"><button class="ic" onclick="go(\'runs\')"><i class="ti ti-chevron-left"></i></button><h2 style="font-size:18px">'+runTypeLabel(s.t)+'</h2><span style="width:38px"></span></div>';
+  var head='<div class="banner" style="background:'+runTypeBg(s.t)+'"><i class="ti ti-run" style="color:'+runTypeCol(s.t)+'"></i><div class="x"><b style="color:'+runTypeCol(s.t)+'">Semaine '+w.n+' · '+esc(w.f)+'</b><br><span style="color:var(--ink)">'+ds+'</span></div></div>';
+  function block(ic,title,txt){ return '<div class="ex"><div class="n"><i class="ti '+ic+'"></i></div><div class="m"><div class="nm">'+title+'</div><div class="ds" style="font-size:13px;line-height:1.5">'+esc(txt)+'</div></div></div>'; }
+  var card='<div class="card" style="padding:6px 14px">'+block('ti-flame','1. Échauffement',base.wu)+block('ti-run','2. La séance',s.m)+block('ti-stretching','3. Retour au calme',base.cd)+'</div>';
+  var tip='<div class="banner" style="background:var(--amber-bg)"><i class="ti ti-bulb" style="color:var(--amber)"></i><div class="x" style="color:#7a4a12"><b>Conseil débutant</b><br><span style="color:var(--ink)">'+esc(base.tip)+'</span></div></div>';
+  var btn=s.done?'<div class="banner" style="background:var(--green-bg)"><i class="ti ti-circle-check" style="color:var(--green)"></i><div class="x" style="color:var(--green)"><b>Séance faite — bravo !</b></div></div><button class="btn outline" onclick="doToggleRunDone()">Annuler « faite »</button>':'<button class="btn" onclick="doToggleRunDone()"><i class="ti ti-check"></i> Marquer comme faite</button>';
+  return tb+head+card+tip+btn;
+}
+async function doToggleRunDone(){
+  var sel=S.selRun; if(!sel||!S.runPlan) return; var s=S.runPlan.weeks[sel.w].sessions[sel.s];
+  s.done=!s.done;
+  try{ await db.from('profiles').update({run_plan:S.runPlan}).eq('id',S.user.id); if(S.profile)S.profile.run_plan=S.runPlan; }catch(e){}
+  render();
+}
+function runUpcomingCard(){
+  if(!S.runPlan) return '';
+  var items=[]; S.runPlan.weeks.forEach(function(w,wi){ w.sessions.forEach(function(s,si){ items.push({wi:wi,si:si,date:s.date,t:s.t,m:s.m,done:s.done}); }); });
+  var td=today();
+  var up=items.filter(function(it){return it.date>=td || !it.done;}).sort(function(a,b){return a.date<b.date?-1:1;}).slice(0,8);
+  if(!up.length) return '';
+  var rows=up.map(function(it){var d=new Date(it.date+'T00:00:00');var ds=isNaN(d)?it.date:d.toLocaleDateString('fr-FR',{weekday:'short',day:'numeric',month:'short'});var ck=it.done?'<i class="ti ti-circle-check" style="color:var(--green);font-size:18px"></i>':'<i class="ti ti-chevron-right" style="color:var(--faint);font-size:16px"></i>';return '<div class="ex" onclick="openRunSession('+it.wi+','+it.si+')" style="cursor:pointer"><div class="n" style="background:'+runTypeBg(it.t)+';color:'+runTypeCol(it.t)+'"><i class="ti ti-run"></i></div><div class="m"><div class="nm">'+ds+' · '+runTypeLabel(it.t)+'</div><div class="ds">'+esc(it.m)+'</div></div>'+ck+'</div>';}).join('');
+  return '<div class="label" style="margin:4px 2px 8px">Plan course — à venir</div><div class="card" style="padding:6px 14px">'+rows+'</div>';
+}
 function navBar(){
   const b=(ic,t)=>'<button class="'+(S.screen===t?'on':'')+'" onclick="go(\''+t+'\')" style="font-size:11px;font-weight:700;color:inherit;letter-spacing:.02em">'+ic+'</button>';
   return b('Accueil','dash')+b('Séance','workout')+b('Nutrition','nutrition')+b('Check-in','checkin')+b('Agenda','calendar');
@@ -479,7 +645,7 @@ function render(extra){
   if(S.screen==='login'){ html=scrLogin(); nav.style.display='none'; }
   else if(S.screen==='result'){ html=scrResult(extra); nav.style.display='flex'; nav.innerHTML=navBar(); }
   else { nav.style.display='flex'; nav.innerHTML=navBar();
-    html = S.screen==='checkin'?scrCheckin():(S.screen==='workout'?scrWorkout():(S.screen==='profile'?scrProfile():(S.screen==='genopts'?scrGenOptions():(S.screen==='charges'?scrCharges():(S.screen==='calendar'?scrCalendar():(S.screen==='coach'?scrCoach():(S.screen==='coachDetail'?scrCoachDetail():(S.screen==='nutrition'?scrNutrition():(S.screen==='runs'?scrRuns():(S.screen==='badges'?scrBadges():(S.screen==='feedback'?scrFeedback():(S.screen==='comps'?scrComps():(S.screen==='assistant'?scrAssistant():(S.screen==='report'?scrReport():scrDash()))))))))))))));
+    html = S.screen==='checkin'?scrCheckin():(S.screen==='workout'?scrWorkout():(S.screen==='profile'?scrProfile():(S.screen==='genopts'?scrGenOptions():(S.screen==='charges'?scrCharges():(S.screen==='calendar'?scrCalendar():(S.screen==='coach'?scrCoach():(S.screen==='coachDetail'?scrCoachDetail():(S.screen==='nutrition'?scrNutrition():(S.screen==='runs'?scrRuns():(S.screen==='badges'?scrBadges():(S.screen==='feedback'?scrFeedback():(S.screen==='comps'?scrComps():(S.screen==='assistant'?scrAssistant():(S.screen==='report'?scrReport():(S.screen==='runplanopts'?scrRunPlanOpts():(S.screen==='runsession'?scrRunSession():scrDash()))))))))))))))));
   }
   sc.innerHTML=html; sc.scrollTop=0; S.msg=null;
   const e=document.getElementById('i-email'); if(e) e.addEventListener('keydown',ev=>{if(ev.key==='Enter')document.getElementById('i-pass').focus();});
