@@ -85,7 +85,7 @@ const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 if ('serviceWorker' in navigator) { window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); }); }
 try{ var __th=localStorage.getItem('coachia-theme'); if(__th) document.documentElement.setAttribute('data-theme',__th); }catch(e){}
 
-const S = { screen:'login', user:null, profile:null, todayCheckin:null, todayScore:null, weights:[], lifts:[], chargeExo:null, history:[], athletes:[], selAthlete:null, selAthleteProfile:null, coachBusy:false, selWeights:[], nutrition:null, meals:[], genNut:false, runs:[], checkinCount:0, comps:[], chat:[], aiThinking:false, report:null, reportLoading:false, runPlan:null, selRun:null, calY:null, calM:null, calSel:null, workout:null, exercises:[], started:false, generating:false, msg:null };
+const S = { screen:'login', user:null, profile:null, todayCheckin:null, todayScore:null, weights:[], lifts:[], chargeExo:null, history:[], athletes:[], selAthlete:null, selAthleteProfile:null, coachBusy:false, selWeights:[], nutrition:null, meals:[], genNut:false, runs:[], checkinCount:0, comps:[], chat:[], aiThinking:false, report:null, reportLoading:false, runPlan:null, selRun:null, muscu:null, selMuscuDay:null, calY:null, calM:null, calSel:null, workout:null, exercises:[], started:false, generating:false, msg:null };
 const today = () => new Date().toISOString().slice(0,10);
 
 function computeScore(c){
@@ -115,6 +115,7 @@ async function loadAll(){
   const { data:prof } = await db.from('profiles').select('*').eq('id', uid).maybeSingle();
   S.profile = prof;
   S.runPlan = (prof && prof.run_plan) || null;
+  S.muscu = (prof && prof.muscu_program) || null;
   const { data:ci } = await db.from('daily_checkins').select('*').eq('athlete_id', uid).eq('date', today()).maybeSingle();
   S.todayCheckin = ci;
   const { data:sc } = await db.from('fitness_scores').select('*').eq('athlete_id', uid).eq('date', today()).maybeSingle();
@@ -186,7 +187,7 @@ function scrDash(){
     goalHint+compBanner()+(p.role==='admin'?'<div class="card" onclick="go(\'coach\')" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between"><div style="display:flex;align-items:center;gap:10px"><i class="ti ti-users" style="color:var(--accent);font-size:20px"></i><span style="font-weight:700">Espace coach</span></div><i class="ti ti-chevron-right" style="color:var(--faint)"></i></div>':'')+scoreCard+
     (hasScore?'<button class="btn outline" onclick="go(\'checkin\')" style="margin-bottom:13px"><i class="ti ti-refresh"></i> Modifier mon check-in du jour</button>':'')+
     seance+
-    '<div class="card"><div class="row" style="margin-bottom:10px"><div class="label">Poids actuel</div><span class="sub" style="font-weight:700;color:var(--ink)">'+lastW+'</span></div>'+weightSVG(w)+'</div>'+'<div class="card" onclick="go(\'charges\')" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between"><div style="display:flex;align-items:center;gap:10px"><i class="ti ti-chart-line" style="color:var(--accent);font-size:20px"></i><span style="font-weight:700">Progression des charges</span></div><i class="ti ti-chevron-right" style="color:var(--faint)"></i></div>'+menuCard('Assistant IA','assistant')+menuCard('Rapport de la semaine','report')+menuCard('Compétitions','comps')+menuCard('Sorties course','runs')+menuCard('Mes badges','badges')+menuCard('Question / Avis','feedback');
+    '<div class="card"><div class="row" style="margin-bottom:10px"><div class="label">Poids actuel</div><span class="sub" style="font-weight:700;color:var(--ink)">'+lastW+'</span></div>'+weightSVG(w)+'</div>'+'<div class="card" onclick="go(\'charges\')" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between"><div style="display:flex;align-items:center;gap:10px"><i class="ti ti-chart-line" style="color:var(--accent);font-size:20px"></i><span style="font-weight:700">Progression des charges</span></div><i class="ti ti-chevron-right" style="color:var(--faint)"></i></div>'+menuCard('Programme muscu','muscu')+menuCard('Assistant IA','assistant')+menuCard('Rapport de la semaine','report')+menuCard('Compétitions','comps')+menuCard('Sorties course','runs')+menuCard('Mes badges','badges')+menuCard('Question / Avis','feedback');
 }
 function scrWorkout(){
   if(S.generating){ return '<div class="tbar"><button class="ic" onclick="go(\'dash\')"><i class="ti ti-chevron-left"></i></button><h2 style="font-size:19px">Séance du jour</h2><span style="width:38px"></span></div><div class="center" style="min-height:380px"><div class="spin" style="border-color:var(--accent);border-top-color:transparent;width:30px;height:30px"></div><div>L\'IA génère ta séance…</div><div class="sub">Quelques secondes</div></div>'; }
@@ -295,6 +296,7 @@ function calEvents(){
   function add(ds,ev){ if(!ds) return; (m[ds]=m[ds]||[]).push(ev); }
   (S.history||[]).forEach(function(w){ add(w.date,{kind:'workout',color:'var(--accent)',label:esc(w.type||'Séance'),status:w.status,id:w.id}); });
   if(S.runPlan){ S.runPlan.weeks.forEach(function(w,wi){ w.sessions.forEach(function(s,si){ add(s.date,{kind:'run',color:'var(--green)',label:runTypeLabel(s.t),wi:wi,si:si,done:s.done}); }); }); }
+  if(S.muscu){ (S.muscu.days||[]).forEach(function(d,di){ add(d.date,{kind:'muscu',color:'var(--accent)',label:esc(d.label||'Muscu'),di:di,done:d.done}); }); }
   (S.comps||[]).forEach(function(c){ add(c.date,{kind:'comp',color:'#8B5CF6',label:esc(c.name||'Compétition')}); });
   return m;
 }
@@ -329,9 +331,9 @@ function scrCalendar(){
     if(!its.length){ detail='<div class="card flat" style="margin-top:10px"><div class="sub" style="text-transform:capitalize">'+dl+' — rien de prévu ce jour-là.</div></div>'; }
     else{
       detail='<div class="label" style="margin:14px 2px 8px;text-transform:capitalize">'+dl+'</div><div class="card" style="padding:6px 14px">'+its.map(function(it){
-        var click=it.kind==='workout'?'openWorkout(\''+it.id+'\')':(it.kind==='run'?'openRunSession('+it.wi+','+it.si+')':'go(\'comps\')');
-        var icon=it.kind==='workout'?'ti-barbell':(it.kind==='run'?'ti-run':'ti-trophy');
-        var badge=it.kind==='workout'?(it.status==='realisee'?'<span class="pill g">Faite</span>':'<span class="pill o">Prévue</span>'):(it.kind==='run'?(it.done?'<span class="pill g">Faite</span>':'<span class="pill o">Prévue</span>'):'');
+        var click=it.kind==='workout'?'openWorkout(\''+it.id+'\')':(it.kind==='run'?'openRunSession('+it.wi+','+it.si+')':(it.kind==='muscu'?'openMuscuDay('+it.di+')':'go(\'comps\')'));
+        var icon=it.kind==='comp'?'ti-trophy':(it.kind==='run'?'ti-run':'ti-barbell');
+        var badge=it.kind==='workout'?(it.status==='realisee'?'<span class="pill g">Faite</span>':'<span class="pill o">Prévue</span>'):((it.kind==='run'||it.kind==='muscu')?(it.done?'<span class="pill g">Faite</span>':'<span class="pill o">Prévue</span>'):'');
         return '<div class="ex" onclick="'+click+'" style="cursor:pointer"><div class="n"><i class="ti '+icon+'" style="color:'+it.color+'"></i></div><div class="m"><div class="nm">'+it.label+'</div></div>'+badge+'</div>';
       }).join('')+'</div>';
     }
@@ -760,6 +762,164 @@ function runUpcomingCard(){
   var rows=up.map(function(it){var d=new Date(it.date+'T00:00:00');var ds=isNaN(d)?it.date:d.toLocaleDateString('fr-FR',{weekday:'short',day:'numeric',month:'short'});var ck=it.done?'<i class="ti ti-circle-check" style="color:var(--green);font-size:18px"></i>':'<i class="ti ti-chevron-right" style="color:var(--faint);font-size:16px"></i>';return '<div class="ex" onclick="openRunSession('+it.wi+','+it.si+')" style="cursor:pointer"><div class="n" style="background:'+runTypeBg(it.t)+';color:'+runTypeCol(it.t)+'"><i class="ti ti-run"></i></div><div class="m"><div class="nm">'+ds+' · '+runTypeLabel(it.t)+'</div><div class="ds">'+esc(it.m)+'</div></div>'+ck+'</div>';}).join('');
   return '<div class="label" style="margin:4px 2px 8px">Plan course — à venir</div><div class="card" style="padding:6px 14px">'+rows+'</div>';
 }
+/* ===== PROGRAMME MUSCU multi-semaines (adaptatif, éditable) ===== */
+function muscuEquipTier(eq){ eq=(eq||'').toLowerCase();
+  if(eq.indexOf('complète')>=0||eq.indexOf('basique')>=0||eq.indexOf('salle')>=0) return 'full';
+  if(eq.indexOf('maison')>=0||eq.indexOf('haltère')>=0||eq.indexOf('barre')>=0) return 'home';
+  if(eq.indexOf('élastique')>=0||eq.indexOf('kettlebell')>=0||eq.indexOf('petit')>=0) return 'mini';
+  return 'none';
+}
+function muscuOffsets(n){ return [[0],[0,3],[0,2,4],[0,1,3,5],[0,1,2,3,4]][Math.min(Math.max(n,1),5)-1]; }
+function muscuSplitDays(split){ return {ppl:['push','pull','legs'], upperlower:['upper','lower'], fullbody:['full']}[split]||['full']; }
+function muscuDayLabel(grp){ return {push:'Push — Pecs / Épaules / Triceps',pull:'Pull — Dos / Biceps',legs:'Legs — Jambes / Fessiers',upper:'Haut du corps',lower:'Bas du corps',full:'Full body'}[grp]||'Séance'; }
+function muscuExo(group,tier){
+  var L={
+    push:{
+      full:[['Développé couché barre',4,'6-8'],['Développé incliné haltères',3,'8-10'],['Dips lestés',3,'8-12'],['Développé militaire',3,'8-10'],['Élévations latérales',3,'12-15'],['Extension triceps poulie',3,'10-12']],
+      home:[['Développé couché haltères',4,'8-10'],['Développé incliné haltères',3,'8-10'],['Pompes',3,'max'],['Développé militaire haltères',3,'8-10'],['Élévations latérales',3,'12-15'],['Extension triceps haltère',3,'10-12']],
+      mini:[['Pompes',4,'max'],['Développé couché élastique',3,'12-15'],['Élévations latérales élastique',3,'15'],['Dips entre 2 chaises',3,'max'],['Extension triceps élastique',3,'15']],
+      none:[['Pompes',4,'max'],['Pompes inclinées',3,'max'],['Pike push-ups (épaules)',3,'8-12'],['Dips sur chaise',3,'max'],['Pompes diamant (triceps)',3,'max']]
+    },
+    pull:{
+      full:[['Tractions',4,'6-10'],['Rowing barre',4,'8-10'],['Tirage vertical',3,'10-12'],['Rowing haltère',3,'10-12'],['Face pull',3,'15'],['Curl biceps barre',3,'10-12']],
+      home:[['Rowing haltère',4,'8-10'],['Soulevé de terre roumain haltères',3,'8-10'],['Tractions (barre de porte)',3,'max'],['Oiseau (rear delt)',3,'15'],['Curl biceps haltères',3,'10-12'],['Curl marteau',3,'12']],
+      mini:[['Tirage élastique',4,'12-15'],['Rowing élastique',4,'12-15'],['Face pull élastique',3,'15'],['Curl biceps élastique',3,'15'],['Curl kettlebell',3,'12']],
+      none:[['Tractions (si barre)',4,'max'],['Rowing australien (sous une table)',4,'max'],['Superman (lombaires)',3,'15'],['Curl sac lesté',3,'15'],['Tirage serviette isométrique',3,'20 s']]
+    },
+    legs:{
+      full:[['Squat barre',4,'6-8'],['Presse à cuisses',3,'10-12'],['Fentes haltères',3,'10/jambe'],['Soulevé de terre roumain',3,'8-10'],['Extension mollets',4,'15'],['Leg curl',3,'12']],
+      home:[['Squat gobelet',4,'8-10'],['Fentes haltères',3,'10/jambe'],['Soulevé de terre roumain haltères',3,'10'],['Squat bulgare',3,'10/jambe'],['Mollets debout',4,'15'],['Pont fessier lesté',3,'12']],
+      mini:[['Squat élastique',4,'15'],['Fentes',3,'12/jambe'],['Soulevé de terre élastique',3,'15'],['Pont fessier',3,'15'],['Mollets',4,'20']],
+      none:[['Squat au poids du corps',4,'15-20'],['Fentes',3,'12/jambe'],['Squat bulgare',3,'10/jambe'],['Pont fessier',3,'15'],['Chaise (isométrie)',3,'45 s'],['Mollets',4,'20']]
+    },
+    upper:{
+      full:[['Développé couché',4,'6-8'],['Tractions',4,'6-10'],['Développé militaire',3,'8-10'],['Rowing barre',3,'8-10'],['Élévations latérales',3,'15'],['Curl biceps',3,'12']],
+      home:[['Développé haltères',4,'8-10'],['Rowing haltère',4,'8-10'],['Développé militaire haltères',3,'8-10'],['Pompes / tractions',3,'max'],['Curl haltères',3,'12'],['Extension triceps',3,'12']],
+      mini:[['Pompes',4,'max'],['Tirage élastique',4,'12-15'],['Développé élastique',3,'12'],['Face pull',3,'15'],['Curl élastique',3,'15']],
+      none:[['Pompes',4,'max'],['Rowing australien',4,'max'],['Pike push-ups',3,'8-12'],['Dips sur chaise',3,'max'],['Superman',3,'15']]
+    },
+    lower:{
+      full:[['Squat barre',4,'6-8'],['Soulevé de terre',3,'5-6'],['Presse',3,'10-12'],['Fentes',3,'10/jambe'],['Mollets',4,'15'],['Leg curl',3,'12']],
+      home:[['Squat gobelet',4,'8-10'],['Soulevé de terre roumain haltères',3,'10'],['Fentes haltères',3,'10/jambe'],['Squat bulgare',3,'10/jambe'],['Pont fessier',3,'15'],['Mollets',4,'15']],
+      mini:[['Squat élastique',4,'15'],['Soulevé de terre élastique',3,'15'],['Fentes',3,'12/jambe'],['Pont fessier',3,'15'],['Mollets',4,'20']],
+      none:[['Squat',4,'15-20'],['Fentes',3,'12/jambe'],['Squat bulgare',3,'10/jambe'],['Pont fessier',3,'15'],['Chaise',3,'45 s'],['Mollets',4,'20']]
+    },
+    full:{
+      full:[['Squat barre',4,'6-8'],['Développé couché',3,'8-10'],['Rowing barre',3,'8-10'],['Développé militaire',3,'10'],['Gainage planche',3,'45 s']],
+      home:[['Squat gobelet',4,'10'],['Développé haltères',3,'10'],['Rowing haltère',3,'10'],['Fentes',3,'10/jambe'],['Gainage planche',3,'45 s']],
+      mini:[['Squat élastique',4,'15'],['Développé élastique',3,'12'],['Tirage élastique',3,'12'],['Fentes',3,'12/jambe'],['Gainage planche',3,'45 s']],
+      none:[['Squat',4,'15-20'],['Pompes',3,'max'],['Rowing australien',3,'max'],['Fentes',3,'12/jambe'],['Gainage planche',3,'45 s']]
+    }
+  };
+  return (L[group]&&L[group][tier])||L.full.none;
+}
+function muscuLastLoad(name){
+  var lifts=S.lifts||[]; var n=(name||'').toLowerCase(); var first=n.split(' ')[0]; var best=null;
+  lifts.forEach(function(l){ var ln=(l.name||'').toLowerCase(); if(ln && (n.indexOf(ln)>=0 || (first.length>3 && ln.indexOf(first)>=0))){ best=l.load; } });
+  return best;
+}
+function buildMuscuProgram(split,perWeek,weeks,equip,start){
+  start=nextMonday(start);
+  var tier=muscuEquipTier(equip);
+  var pattern=muscuSplitDays(split);
+  var offs=muscuOffsets(perWeek);
+  var days=[]; var counter=0;
+  for(var w=1;w<=weeks;w++){
+    for(var s=0;s<perWeek;s++){
+      var grp=pattern[counter % pattern.length]; counter++;
+      var lib=muscuExo(grp,tier);
+      var deload=(w===weeks && weeks>=4);
+      var exs=lib.map(function(e){
+        var base=muscuLastLoad(e[0]);
+        var load=base?((deload?Math.round(base*0.9):base)+' kg'):'';
+        var sets=deload?Math.max(2,e[1]-1):e[1];
+        return {name:e[0], sets:sets, reps:e[2], load:load, rest:'2 min', done:false};
+      });
+      days.push({ id:'w'+w+'d'+(s+1), week:w, label:muscuDayLabel(grp), date:addDays(start,(w-1)*7+offs[s%offs.length]), deload:deload, done:false, exercises:exs });
+    }
+  }
+  return {split:split, perWeek:perWeek, weeks:weeks, equip:equip, start:start, days:days};
+}
+function muscuWeekHint(w,total,deload){
+  if(deload) return 'Semaine d’assimilation (deload) : charges allégées (~-10 %) et un peu moins de volume. Récupère bien, c’est là que le muscle se construit.';
+  if(w<=2) return 'Mise en route : trouve la bonne charge (finir chaque série avec 1-2 répétitions en réserve), technique parfaite.';
+  if(w<=Math.ceil(total*0.7)) return 'Surcharge progressive : ajoute 1 répétition ou +2,5 kg dès que tu réussis toutes tes séries proprement.';
+  return 'Pic d’intensité : vise ta meilleure perf tout en gardant une technique nette.';
+}
+function muscuProgress(){ var p=S.muscu; if(!p) return {done:0,total:0}; var d=0; (p.days||[]).forEach(function(x){ if(x.done)d++; }); return {done:d,total:(p.days||[]).length}; }
+function scrMuscu(){
+  var tb='<div class="tbar"><button class="ic" onclick="go(\'dash\')"><i class="ti ti-chevron-left"></i></button><h2 style="font-size:19px">Programme muscu</h2><span style="width:38px"></span></div>';
+  var msg=S.msg?'<div class="msg '+S.msg.k+'">'+S.msg.t+'</div>':'';
+  if(!S.muscu){
+    return tb+msg+'<div class="card"><div style="font-weight:700;margin-bottom:4px">Ton programme de musculation 🏋️</div><div class="sub" style="margin-bottom:12px">Un programme structuré sur plusieurs semaines (Push/Pull/Legs, Haut/Bas ou Full body), adapté à ton matériel, avec surcharge progressive. Il pré-remplit tes charges à partir de tes derniers relevés.</div><button class="btn" onclick="go(\'muscuopts\')">Créer mon programme</button></div>';
+  }
+  var pr=muscuProgress(); var pct=pr.total?Math.round(pr.done/pr.total*100):0;
+  var splitLabel={ppl:'Push / Pull / Legs',upperlower:'Haut / Bas',fullbody:'Full body'}[S.muscu.split]||'Programme';
+  var headCard='<div class="card"><div class="row" style="margin-bottom:6px"><div class="label">'+splitLabel+'</div><span class="pill o">'+S.muscu.perWeek+'×/sem · '+S.muscu.weeks+' sem.</span></div><div class="row"><span class="sub">Progression</span><span class="sub" style="font-weight:700;color:var(--ink)">'+pr.done+' / '+pr.total+' séances</span></div><div style="height:8px;border-radius:999px;background:var(--bg);margin-top:8px;overflow:hidden"><i style="display:block;height:100%;width:'+pct+'%;background:var(--accent)"></i></div></div>';
+  var byWeek={}; (S.muscu.days||[]).forEach(function(d,i){ (byWeek[d.week]=byWeek[d.week]||[]).push({d:d,i:i}); });
+  var weeksHtml=Object.keys(byWeek).map(function(wk){
+    var rows=byWeek[wk].map(function(o){
+      var d=o.d; var dt=new Date(d.date+'T00:00:00'); var ds=isNaN(dt)?d.date:dt.toLocaleDateString('fr-FR',{weekday:'short',day:'numeric',month:'short'});
+      var check=d.done?'<i class="ti ti-circle-check" style="color:var(--green);font-size:20px"></i>':'<i class="ti ti-chevron-right" style="color:var(--faint);font-size:18px"></i>';
+      return '<div class="ex" onclick="openMuscuDay('+o.i+')" style="cursor:pointer"><div class="n"><i class="ti ti-barbell"></i></div><div class="m"><div class="nm">'+ds+' · '+esc(d.label)+'</div><div class="ds">'+d.exercises.length+' exercices'+(d.deload?' · deload':'')+'</div></div>'+check+'</div>';
+    }).join('');
+    return '<div class="card" style="padding:4px 14px"><div class="label" style="padding:10px 0 4px">Semaine '+wk+'</div>'+rows+'</div>';
+  }).join('');
+  return tb+msg+headCard+'<div class="label" style="margin:6px 2px 8px">Mon programme</div>'+weeksHtml+'<button class="btn outline" onclick="go(\'muscuopts\')" style="margin-bottom:14px"><i class="ti ti-refresh"></i> Régénérer / modifier le programme</button>';
+}
+function scrMuscuOpts(){
+  var p=S.profile||{};
+  var tb='<div class="tbar"><button class="ic" onclick="go(\'muscu\')"><i class="ti ti-chevron-left"></i></button><h2 style="font-size:19px">Créer mon programme</h2><span style="width:38px"></span></div>';
+  var eq=[['Salle de sport complète','Salle de sport complète'],['Salle de sport (basique)','Salle de sport (basique)'],['Matériel maison (haltères/barre)','Matériel maison (haltères/barre)'],['Petit matériel (élastiques, kettlebell)','Petit matériel (élastiques, kettlebell)'],['Sans matériel (poids du corps)','Sans matériel (poids du corps)']];
+  return tb+'<div class="banner" style="background:var(--accent-soft)"><i class="ti ti-barbell" style="color:var(--accent)"></i><div class="x" style="color:#1742a5">On te crée un programme progressif. Il s’adapte à ton matériel et pré-remplit tes charges à partir de tes derniers relevés.</div></div>'+
+    '<div class="card"><div class="flabel">Type de programme (split)</div><select class="in" id="mp-split"><option value="auto" selected>Automatique (selon le nombre de séances)</option><option value="fullbody">Full body (tout le corps)</option><option value="upperlower">Haut / Bas</option><option value="ppl">Push / Pull / Legs</option></select></div>'+
+    '<div class="card"><div class="flabel">Séances de muscu par semaine</div><select class="in" id="mp-week"><option value="3" selected>3 par semaine</option><option value="4">4 par semaine</option><option value="5">5 par semaine</option></select></div>'+
+    '<div class="card"><div class="flabel">Durée du programme</div><select class="in" id="mp-weeks"><option value="4">4 semaines</option><option value="6" selected>6 semaines</option><option value="8">8 semaines</option></select></div>'+
+    selField('mp-equip','Matériel disponible',p.available_equipment,eq)+
+    '<div class="card"><div class="flabel">Date de début (démarre le lundi suivant)</div><input id="mp-start" class="in" type="date" value="'+today()+'"></div>'+
+    '<button class="btn" onclick="doCreateMuscu()"><i class="ti ti-sparkles"></i> Générer mon programme</button>';
+}
+async function doCreateMuscu(){
+  var split=document.getElementById('mp-split').value;
+  var per=parseInt(document.getElementById('mp-week').value)||3;
+  var weeks=parseInt(document.getElementById('mp-weeks').value)||6;
+  var eqEl=document.getElementById('mp-equip'); var equip=(eqEl&&eqEl.value)||(S.profile&&S.profile.available_equipment)||'Salle de sport (basique)';
+  var start=document.getElementById('mp-start').value||today();
+  if(split==='auto'){ split=per<=3?'fullbody':(per===4?'upperlower':'ppl'); }
+  var prog=buildMuscuProgram(split,per,weeks,equip,start);
+  try{ await db.from('profiles').update({muscu_program:prog}).eq('id',S.user.id); S.muscu=prog; if(S.profile)S.profile.muscu_program=prog; S.msg={k:'ok',t:'Programme muscu créé ! Suis-le séance après séance.'}; }
+  catch(e){ S.msg={k:'err',t:'Erreur : '+(e.message||e)+' (la colonne muscu_program a-t-elle été ajoutée dans Supabase ?)'}; }
+  S.screen='muscu'; render();
+}
+async function doResetMuscu(){ S.screen='muscuopts'; render(); }
+function openMuscuDay(idx){ S.selMuscuDay=idx; S.screen='muscuday'; render(); }
+function scrMuscuDay(){
+  var idx=S.selMuscuDay; if(idx==null||!S.muscu||!S.muscu.days[idx]) return scrMuscu();
+  var d=S.muscu.days[idx];
+  var dt=new Date(d.date+'T00:00:00'); var ds=isNaN(dt)?d.date:dt.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'});
+  var tb='<div class="tbar"><button class="ic" onclick="go(\'muscu\')"><i class="ti ti-chevron-left"></i></button><h2 style="font-size:18px">'+esc(d.label)+'</h2><span style="width:38px"></span></div>';
+  var msg=S.msg?'<div class="msg '+S.msg.k+'">'+S.msg.t+'</div>':'';
+  var head='<div class="banner" style="background:var(--accent-soft)"><i class="ti ti-barbell" style="color:var(--accent)"></i><div class="x" style="color:#1742a5"><b>Semaine '+d.week+' · '+esc(d.label)+'</b><br><span style="color:var(--ink)">'+ds+'</span></div></div>';
+  var hint='<div class="banner" style="background:var(--amber-bg)"><i class="ti ti-bulb" style="color:var(--amber)"></i><div class="x" style="color:#7a4a12">'+esc(muscuWeekHint(d.week,S.muscu.weeks,d.deload))+'</div></div>';
+  var list=d.exercises.map(function(e,i){
+    return '<div class="ex"><div class="n">'+(i+1)+'</div><div class="m"><div class="nm">'+esc(e.name)+'</div><div class="ds">'+e.sets+' séries × '+esc(e.reps)+' · repos '+esc(e.rest||'2 min')+'</div><div style="margin-top:7px;display:flex;align-items:center;gap:8px"><span style="font-size:10px;color:var(--faint);font-weight:700">CHARGE</span><input id="mx-'+i+'" type="text" value="'+esc(e.load||'')+'" placeholder="ex : 40 kg" style="width:110px;border:1px solid var(--line);border-radius:9px;padding:7px;font:inherit;font-size:13px;font-weight:700;text-align:center;background:var(--bg);color:var(--ink)"></div></div></div>';
+  }).join('');
+  var btnDone=d.done?'<div class="banner" style="background:var(--green-bg)"><i class="ti ti-circle-check" style="color:var(--green)"></i><div class="x" style="color:var(--green)"><b>Séance faite — bravo !</b></div></div><button class="btn outline" onclick="doToggleMuscuDone()">Annuler « faite »</button>':'<button class="btn" onclick="doToggleMuscuDone()"><i class="ti ti-check"></i> Marquer comme faite</button>';
+  return tb+msg+head+hint+'<div class="card" style="padding:6px 14px">'+list+'</div><button class="btn outline" onclick="doSaveMuscuLoads()" style="margin-bottom:9px"><i class="ti ti-device-floppy"></i> Enregistrer mes charges</button>'+btnDone;
+}
+async function doSaveMuscuLoads(){
+  var idx=S.selMuscuDay; if(idx==null||!S.muscu) return; var d=S.muscu.days[idx];
+  d.exercises.forEach(function(e,i){ var el=document.getElementById('mx-'+i); if(el) e.load=el.value.trim(); });
+  try{ await db.from('profiles').update({muscu_program:S.muscu}).eq('id',S.user.id); if(S.profile)S.profile.muscu_program=S.muscu; S.msg={k:'ok',t:'Charges enregistrées.'}; }catch(e){ S.msg={k:'err',t:'Erreur : '+(e.message||e)}; }
+  render();
+}
+async function doToggleMuscuDone(){
+  var idx=S.selMuscuDay; if(idx==null||!S.muscu) return; var d=S.muscu.days[idx];
+  d.exercises.forEach(function(e,i){ var el=document.getElementById('mx-'+i); if(el) e.load=el.value.trim(); });
+  d.done=!d.done;
+  try{ await db.from('profiles').update({muscu_program:S.muscu}).eq('id',S.user.id); if(S.profile)S.profile.muscu_program=S.muscu; }catch(e){}
+  render();
+}
 function navBar(){
   const b=(ic,t)=>'<button class="'+(S.screen===t?'on':'')+'" onclick="go(\''+t+'\')" style="font-size:11px;font-weight:700;color:inherit;letter-spacing:.02em">'+ic+'</button>';
   return b('Accueil','dash')+b('Séance','workout')+b('Nutrition','nutrition')+b('Check-in','checkin')+b('Agenda','calendar');
@@ -770,7 +930,7 @@ function render(extra){
   if(S.screen==='login'){ html=scrLogin(); nav.style.display='none'; }
   else if(S.screen==='result'){ html=scrResult(extra); nav.style.display='flex'; nav.innerHTML=navBar(); }
   else { nav.style.display='flex'; nav.innerHTML=navBar();
-    html = S.screen==='checkin'?scrCheckin():(S.screen==='workout'?scrWorkout():(S.screen==='profile'?scrProfile():(S.screen==='genopts'?scrGenOptions():(S.screen==='charges'?scrCharges():(S.screen==='calendar'?scrCalendar():(S.screen==='coach'?scrCoach():(S.screen==='coachDetail'?scrCoachDetail():(S.screen==='nutrition'?scrNutrition():(S.screen==='runs'?scrRuns():(S.screen==='badges'?scrBadges():(S.screen==='feedback'?scrFeedback():(S.screen==='comps'?scrComps():(S.screen==='assistant'?scrAssistant():(S.screen==='report'?scrReport():(S.screen==='runplanopts'?scrRunPlanOpts():(S.screen==='runsession'?scrRunSession():(S.screen==='newathlete'?scrNewAthlete():(S.screen==='athleteEdit'?scrAthleteEdit():scrDash()))))))))))))))))));
+    html = S.screen==='checkin'?scrCheckin():(S.screen==='workout'?scrWorkout():(S.screen==='profile'?scrProfile():(S.screen==='genopts'?scrGenOptions():(S.screen==='charges'?scrCharges():(S.screen==='calendar'?scrCalendar():(S.screen==='coach'?scrCoach():(S.screen==='coachDetail'?scrCoachDetail():(S.screen==='nutrition'?scrNutrition():(S.screen==='runs'?scrRuns():(S.screen==='badges'?scrBadges():(S.screen==='feedback'?scrFeedback():(S.screen==='comps'?scrComps():(S.screen==='assistant'?scrAssistant():(S.screen==='report'?scrReport():(S.screen==='runplanopts'?scrRunPlanOpts():(S.screen==='runsession'?scrRunSession():(S.screen==='newathlete'?scrNewAthlete():(S.screen==='athleteEdit'?scrAthleteEdit():(S.screen==='muscu'?scrMuscu():(S.screen==='muscuopts'?scrMuscuOpts():(S.screen==='muscuday'?scrMuscuDay():scrDash())))))))))))))))))))));
   }
   sc.innerHTML=html; sc.scrollTop=0; S.msg=null;
   const e=document.getElementById('i-email'); if(e) e.addEventListener('keydown',ev=>{if(ev.key==='Enter')document.getElementById('i-pass').focus();});
