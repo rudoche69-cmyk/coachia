@@ -57,6 +57,16 @@
   .ath{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--line)} .ath:last-child{border-bottom:none}
   .av{width:38px;height:38px;border-radius:50%;background:var(--accent-soft);color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex:0 0 auto} .ath .m{flex:1} .ath .nm{font-size:14px;font-weight:600} .ath .ds{font-size:11px;color:var(--muted)}
   .macro{margin-bottom:9px} .macro .bar{height:7px;border-radius:999px;background:var(--bg);margin-top:5px;overflow:hidden} .macro .bar i{display:block;height:100%}
+  .cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+  .cal .h{text-align:center;font-size:10px;font-weight:700;color:var(--faint);padding:2px 0}
+  .cal .d{aspect-ratio:1/1;border-radius:10px;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:5px 0 0;font-size:12.5px;font-weight:600;cursor:pointer;border:2px solid transparent}
+  .cal .d.out{background:transparent;cursor:default}
+  .cal .d.today{border-color:var(--accent)}
+  .cal .d.sel{background:var(--accent-soft)}
+  .cal .dots{display:flex;gap:2px;margin-top:3px;flex-wrap:wrap;justify-content:center;max-width:90%}
+  .cal .dt{width:6px;height:6px;border-radius:50%}
+  .lg{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--muted);margin-right:12px}
+  .lg i{width:9px;height:9px;border-radius:50%;display:inline-block}
 </style>
 </head>
 <body>
@@ -75,7 +85,7 @@ const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 if ('serviceWorker' in navigator) { window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); }); }
 try{ var __th=localStorage.getItem('coachia-theme'); if(__th) document.documentElement.setAttribute('data-theme',__th); }catch(e){}
 
-const S = { screen:'login', user:null, profile:null, todayCheckin:null, todayScore:null, weights:[], lifts:[], chargeExo:null, history:[], athletes:[], selAthlete:null, selAthleteProfile:null, coachBusy:false, selWeights:[], nutrition:null, meals:[], genNut:false, runs:[], checkinCount:0, comps:[], chat:[], aiThinking:false, report:null, reportLoading:false, runPlan:null, selRun:null, workout:null, exercises:[], started:false, generating:false, msg:null };
+const S = { screen:'login', user:null, profile:null, todayCheckin:null, todayScore:null, weights:[], lifts:[], chargeExo:null, history:[], athletes:[], selAthlete:null, selAthleteProfile:null, coachBusy:false, selWeights:[], nutrition:null, meals:[], genNut:false, runs:[], checkinCount:0, comps:[], chat:[], aiThinking:false, report:null, reportLoading:false, runPlan:null, selRun:null, calY:null, calM:null, calSel:null, workout:null, exercises:[], started:false, generating:false, msg:null };
 const today = () => new Date().toISOString().slice(0,10);
 
 function computeScore(c){
@@ -280,20 +290,58 @@ async function doSaveLoads(){
   for(var i=0;i<S.exercises.length;i++){ var e=S.exercises[i]; var el=document.getElementById('al-'+e.id); if(!el) continue; var raw=el.value.trim(); var val=raw===''?null:parseFloat(raw); try{ await db.from('workout_exercises').update({actual_load:val}).eq('id',e.id); n++; }catch(_){} }
   await loadAll(); S.msg={k:'ok',t:'Charges enregistrées.'}; S.screen='workout'; render();
 }
-function scrCalendar(){
-  var h=S.history||[];
-  var tb='<div class="tbar"><button class="ic" onclick="go(\'dash\')"><i class="ti ti-chevron-left"></i></button><h2 style="font-size:19px">Calendrier</h2><span style="width:38px"></span></div>';
-  var planCard=runUpcomingCard();
-  if(!h.length && !planCard) return tb+'<div class="card flat" style="text-align:center;padding:26px 16px"><i class="ti ti-calendar" style="font-size:34px;color:var(--faint)"></i><div style="font-weight:700;margin:10px 0 4px">Aucune séance</div><div class="sub">Génère ta première séance, ou crée un plan course, pour les voir apparaître ici.</div></div>';
-  var rows=h.map(function(w){
-    var d=new Date((w.date||'')+'T00:00:00');
-    var ds=isNaN(d)?(w.date||''):d.toLocaleDateString('fr-FR',{weekday:'short',day:'numeric',month:'short'});
-    var badge=w.status==='realisee'?'<span class="pill g">Faite</span>':(w.status==='manquee'?'<span class="pill r">Manquée</span>':'<span class="pill o">Prévue</span>');
-    return '<div class="ex" onclick="openWorkout(\''+w.id+'\')" style="cursor:pointer"><div class="n"><i class="ti ti-barbell"></i></div><div class="m"><div class="nm">'+esc(w.type||'Séance')+'</div><div class="ds">'+ds+(w.estimated_duration?' · '+w.estimated_duration+' min':'')+'</div></div>'+badge+'</div>';
-  }).join('');
-  var wkCard=h.length?('<div class="label" style="margin:6px 2px 8px">Séances de muscu / cross</div><div class="card" style="padding:6px 14px">'+rows+'</div>'):'';
-  return tb+planCard+wkCard;
+function calEvents(){
+  var m={};
+  function add(ds,ev){ if(!ds) return; (m[ds]=m[ds]||[]).push(ev); }
+  (S.history||[]).forEach(function(w){ add(w.date,{kind:'workout',color:'var(--accent)',label:esc(w.type||'Séance'),status:w.status,id:w.id}); });
+  if(S.runPlan){ S.runPlan.weeks.forEach(function(w,wi){ w.sessions.forEach(function(s,si){ add(s.date,{kind:'run',color:'var(--green)',label:runTypeLabel(s.t),wi:wi,si:si,done:s.done}); }); }); }
+  (S.comps||[]).forEach(function(c){ add(c.date,{kind:'comp',color:'#8B5CF6',label:esc(c.name||'Compétition')}); });
+  return m;
 }
+function scrCalendar(){
+  if(S.calY==null){ var t=new Date(); S.calY=t.getFullYear(); S.calM=t.getMonth(); }
+  var tb='<div class="tbar"><button class="ic" onclick="go(\'dash\')"><i class="ti ti-chevron-left"></i></button><h2 style="font-size:19px">Agenda</h2><span style="width:38px"></span></div>';
+  var ev=calEvents();
+  var first=new Date(S.calY,S.calM,1);
+  var startOffset=(first.getDay()+6)%7;
+  var daysIn=new Date(S.calY,S.calM+1,0).getDate();
+  var todayStr=today();
+  var monthLabel=first.toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
+  var head='<div class="row" style="margin-bottom:14px"><button class="ic" onclick="calNav(-1)"><i class="ti ti-chevron-left"></i></button><div style="font-weight:700;font-size:16px;text-transform:capitalize">'+monthLabel+'</div><button class="ic" onclick="calNav(1)"><i class="ti ti-chevron-right"></i></button></div>';
+  var days=['LU','MA','ME','JE','VE','SA','DI'];
+  var grid='<div class="cal">'+days.map(function(d){return '<div class="h">'+d+'</div>';}).join('');
+  var i;
+  for(i=0;i<startOffset;i++){ grid+='<div class="d out"></div>'; }
+  for(var day=1;day<=daysIn;day++){
+    var ds=S.calY+'-'+('0'+(S.calM+1)).slice(-2)+'-'+('0'+day).slice(-2);
+    var items=ev[ds]||[];
+    var seen={}; var dots='';
+    items.forEach(function(it){ if(!seen[it.color]){ seen[it.color]=1; dots+='<span class="dt" style="background:'+it.color+'"></span>'; } });
+    var cls='d'+(ds===todayStr?' today':'')+(ds===S.calSel?' sel':'');
+    grid+='<div class="'+cls+'" onclick="calSelectDay(\''+ds+'\')">'+day+'<div class="dots">'+dots+'</div></div>';
+  }
+  grid+='</div>';
+  var legend='<div style="margin:14px 2px 4px"><span class="lg"><i style="background:var(--accent)"></i>Muscu / séance</span><span class="lg"><i style="background:var(--green)"></i>Course</span><span class="lg"><i style="background:#8B5CF6"></i>Compétition</span></div>';
+  var detail='';
+  if(S.calSel){
+    var its=ev[S.calSel]||[];
+    var dl=new Date(S.calSel+'T00:00:00').toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'});
+    if(!its.length){ detail='<div class="card flat" style="margin-top:10px"><div class="sub" style="text-transform:capitalize">'+dl+' — rien de prévu ce jour-là.</div></div>'; }
+    else{
+      detail='<div class="label" style="margin:14px 2px 8px;text-transform:capitalize">'+dl+'</div><div class="card" style="padding:6px 14px">'+its.map(function(it){
+        var click=it.kind==='workout'?'openWorkout(\''+it.id+'\')':(it.kind==='run'?'openRunSession('+it.wi+','+it.si+')':'go(\'comps\')');
+        var icon=it.kind==='workout'?'ti-barbell':(it.kind==='run'?'ti-run':'ti-trophy');
+        var badge=it.kind==='workout'?(it.status==='realisee'?'<span class="pill g">Faite</span>':'<span class="pill o">Prévue</span>'):(it.kind==='run'?(it.done?'<span class="pill g">Faite</span>':'<span class="pill o">Prévue</span>'):'');
+        return '<div class="ex" onclick="'+click+'" style="cursor:pointer"><div class="n"><i class="ti '+icon+'" style="color:'+it.color+'"></i></div><div class="m"><div class="nm">'+it.label+'</div></div>'+badge+'</div>';
+      }).join('')+'</div>';
+    }
+  } else {
+    detail='<div class="sub" style="text-align:center;margin-top:12px;font-size:12px">Touche un jour pour voir le détail.</div>';
+  }
+  return tb+head+grid+legend+detail;
+}
+function calNav(delta){ S.calM+=delta; if(S.calM<0){ S.calM=11; S.calY--; } if(S.calM>11){ S.calM=0; S.calY++; } S.calSel=null; render(); }
+function calSelectDay(ds){ S.calSel=(S.calSel===ds?null:ds); render(); }
 async function openWorkout(id){
   try{ var fr=await db.from('workouts').select('*').eq('id',id).maybeSingle(); if(fr.data) S.workout=fr.data; }catch(_){}
   try{ var r=await db.from('workout_exercises').select('*').eq('workout_id',id).order('position',{ascending:true}); S.exercises=r.data||[]; }catch(_){ S.exercises=[]; }
@@ -628,7 +676,9 @@ function runWeekPlan(k){
 }
 function runDayOffsets(n){ return n<=2?[0,3]:(n===3?[0,2,4]:(n>=4?[0,1,3,5]:[0,2,4])); }
 function addDays(dstr,n){ var d=new Date(dstr+'T00:00:00'); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); }
+function nextMonday(dstr){ var d=new Date(dstr+'T00:00:00'); var wd=(d.getDay()+6)%7; if(wd!==0){ d.setDate(d.getDate()+(7-wd)); } return d.toISOString().slice(0,10); }
 function buildRunPlan(goalKey,perWeek,start){
+  start=nextMonday(start);
   var tmpl=runWeekPlan(goalKey); var weeks=[];
   for(var w=0;w<tmpl.length;w++){
     var pool=tmpl[w].p;
@@ -663,7 +713,7 @@ function scrRunPlanOpts(){
   return tb+'<div class="banner" style="background:var(--accent-soft)"><i class="ti ti-route" style="color:var(--accent)"></i><div class="x" style="color:#1742a5">Choisis ton objectif : on te crée un plan progressif, semaine par semaine. Chaque séance sera détaillée pas à pas — tu n’as qu’à suivre.</div></div>'+
     '<div class="card"><div class="flabel">Mon objectif</div><select class="in" id="rp-goal">'+gopts+'</select></div>'+
     '<div class="card"><div class="flabel">Combien de séances de course par semaine ?</div><select class="in" id="rp-week"><option value="2">2 par semaine</option><option value="3" selected>3 par semaine</option><option value="4">4 par semaine</option></select></div>'+
-    '<div class="card"><div class="flabel">Date de début</div><input id="rp-start" class="in" type="date" value="'+today()+'"></div>'+
+    '<div class="card"><div class="flabel">Date de début (le plan démarrera le lundi suivant)</div><input id="rp-start" class="in" type="date" value="'+today()+'"></div>'+
     '<button class="btn" onclick="doCreateRunPlan()"><i class="ti ti-sparkles"></i> Générer mon plan</button>';
 }
 async function doCreateRunPlan(){
