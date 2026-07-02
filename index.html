@@ -67,6 +67,11 @@
   .cal .dt{width:6px;height:6px;border-radius:50%}
   .lg{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--muted);margin-right:12px}
   .lg i{width:9px;height:9px;border-radius:50%;display:inline-block}
+  .tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .tile{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:15px 13px;cursor:pointer;display:flex;flex-direction:column;gap:9px;align-items:flex-start}
+  .tile:active{transform:scale(.98)}
+  .tile i{font-size:22px;color:var(--accent)}
+  .tile .tl{font-weight:700;font-size:13px;line-height:1.2}
 </style>
 </head>
 <body>
@@ -85,7 +90,7 @@ const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 if ('serviceWorker' in navigator) { window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); }); }
 try{ var __th=localStorage.getItem('coachia-theme'); if(__th) document.documentElement.setAttribute('data-theme',__th); }catch(e){}
 
-const S = { screen:'login', user:null, profile:null, todayCheckin:null, todayScore:null, weights:[], lifts:[], chargeExo:null, history:[], athletes:[], selAthlete:null, selAthleteProfile:null, coachBusy:false, selWeights:[], nutrition:null, meals:[], genNut:false, foodLog:[], runs:[], checkinCount:0, comps:[], chat:[], aiThinking:false, report:null, reportLoading:false, runPlan:null, selRun:null, muscu:null, selMuscuDay:null, calY:null, calM:null, calSel:null, workout:null, exercises:[], started:false, generating:false, msg:null };
+const S = { screen:'login', user:null, profile:null, todayCheckin:null, todayScore:null, weights:[], lifts:[], chargeExo:null, history:[], athletes:[], selAthlete:null, selAthleteProfile:null, coachBusy:false, selWeights:[], nutrition:null, meals:[], genNut:false, foodLog:[], runs:[], checkinCount:0, comps:[], chat:[], aiThinking:false, report:null, reportLoading:false, runPlan:null, selRun:null, muscu:null, selMuscuDay:null, leaderboard:null, calY:null, calM:null, calSel:null, workout:null, exercises:[], started:false, generating:false, msg:null };
 const today = () => new Date().toISOString().slice(0,10);
 
 function computeScore(c){
@@ -134,6 +139,7 @@ async function loadAll(){
   try{ const cc=await db.from('daily_checkins').select('id',{count:'exact',head:true}).eq('athlete_id',uid); S.checkinCount=cc.count||0; }catch(_){ S.checkinCount=0; }
   try{ const cp=await db.from('competitions').select('*').eq('athlete_id',uid); S.comps=cp.data||[]; }catch(_){ S.comps=[]; }
   try{ const hr = await db.from('workouts').select('*').eq('athlete_id',uid).order('date',{ascending:false}).limit(60); S.history=hr.data||[]; }catch(_){ S.history=[]; }
+  try{ await db.from('leaderboard_points').upsert({athlete_id:uid, first_name:(prof&&prof.first_name)||'Athlète', points:computePoints(), updated_at:new Date().toISOString()}, {onConflict:'athlete_id'}); }catch(_){}
   S.athletes=[];
   if(S.profile && S.profile.role==='admin'){ try{ const ar = await db.from('profiles').select('id,first_name,last_name,main_goal').neq('id',uid).order('first_name',{ascending:true}); const sr = await db.from('fitness_scores').select('athlete_id,level,score,date').order('date',{ascending:false}).limit(500); const latest={}; (sr.data||[]).forEach(function(r){ if(!latest[r.athlete_id]) latest[r.athlete_id]=r; }); S.athletes=(ar.data||[]).map(function(a){ a.score=latest[a.id]||null; return a; }); }catch(_){ S.athletes=[]; } }
 }
@@ -188,7 +194,7 @@ function scrDash(){
     goalHint+compBanner()+(p.role==='admin'?'<div class="card" onclick="go(\'coach\')" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between"><div style="display:flex;align-items:center;gap:10px"><i class="ti ti-users" style="color:var(--accent);font-size:20px"></i><span style="font-weight:700">Espace coach</span></div><i class="ti ti-chevron-right" style="color:var(--faint)"></i></div>':'')+scoreCard+
     (hasScore?'<button class="btn outline" onclick="go(\'checkin\')" style="margin-bottom:13px"><i class="ti ti-refresh"></i> Modifier mon check-in du jour</button>':'')+
     seance+
-    '<div class="card"><div class="row" style="margin-bottom:10px"><div class="label">Poids actuel</div><span class="sub" style="font-weight:700;color:var(--ink)">'+lastW+'</span></div>'+weightSVG(w)+'</div>'+'<div class="card" onclick="go(\'charges\')" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between"><div style="display:flex;align-items:center;gap:10px"><i class="ti ti-chart-line" style="color:var(--accent);font-size:20px"></i><span style="font-weight:700">Progression des charges</span></div><i class="ti ti-chevron-right" style="color:var(--faint)"></i></div>'+menuCard('Programme muscu','muscu')+menuCard('Assistant IA','assistant')+menuCard('Rapport de la semaine','report')+menuCard('Compétitions','comps')+menuCard('Sorties course','runs')+menuCard('Mes badges','badges')+menuCard('Question / Avis','feedback');
+    '<div class="card"><div class="row" style="margin-bottom:10px"><div class="label">Poids actuel</div><span class="sub" style="font-weight:700;color:var(--ink)">'+lastW+'</span></div>'+weightSVG(w)+'</div>'+'<div class="label" style="margin:14px 2px 8px">Mes outils</div><div class="tiles">'+tile('ti-barbell','Programme muscu','muscu')+tile('ti-run','Sorties course','runs')+tile('ti-salad','Nutrition','nutrition')+tile('ti-calendar-event','Agenda','calendar')+tile('ti-chart-line','Charges','charges')+tile('ti-robot','Assistant IA','assistant')+tile('ti-file-text','Rapport','report')+tile('ti-trophy','Compétitions','comps')+tile('ti-medal','Mes badges','badges')+tile('ti-crown','Classement','leaderboard')+tile('ti-message-circle','Avis','feedback')+'</div>';
 }
 function scrWorkout(){
   if(S.generating){ return '<div class="tbar"><button class="ic" onclick="go(\'dash\')"><i class="ti ti-chevron-left"></i></button><h2 style="font-size:19px">Séance du jour</h2><span style="width:38px"></span></div><div class="center" style="min-height:380px"><div class="spin" style="border-color:var(--accent);border-top-color:transparent;width:30px;height:30px"></div><div>L\'IA génère ta séance…</div><div class="sub">Quelques secondes</div></div>'; }
@@ -502,6 +508,7 @@ async function doGenNutrition(){
   }catch(e){ S.genNut=false; S.msg={k:'err',t:'Erreur : '+(e.message||e)}; render(); }
 }
 function menuCard(label,target){ return '<div class="card" onclick="go(\''+target+'\')" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between"><span style="font-weight:700">'+label+'</span><span style="color:var(--faint);font-size:18px">›</span></div>'; }
+function tile(ic,label,target){ return '<div class="tile" onclick="go(\''+target+'\')"><i class="ti '+ic+'"></i><span class="tl">'+label+'</span></div>'; }
 function scrRuns(){
   var tb='<div class="tbar"><button class="ic" onclick="go(\'dash\')"><i class="ti ti-chevron-left"></i></button><h2 style="font-size:19px">Sorties course</h2><span style="width:38px"></span></div>';
   var msg=S.msg?'<div class="msg '+S.msg.k+'">'+S.msg.t+'</div>':'';
@@ -546,16 +553,48 @@ function computeBadges(){
   var runs=(S.runs||[]).length;
   var totalKm=(S.runs||[]).reduce(function(a,r){return a+(Number(r.distance_km)||0);},0);
   var w=S.weights||[]; var delta=w.length>=2?(Number(w[w.length-1].weight)-Number(w[0].weight)):0;
+  var muscuDone=S.muscu?(S.muscu.days||[]).filter(function(d){return d.done;}).length:0;
+  var runDone=S.runPlan?S.runPlan.weeks.reduce(function(a,wk){return a+wk.sessions.filter(function(s){return s.done;}).length;},0):0;
   return [
     {n:'Premier pas', d:'1er check-in', ok:ci>=1},
     {n:'Régulier', d:'7 check-ins', ok:ci>=7},
     {n:'Assidu', d:'30 check-ins', ok:ci>=30},
+    {n:'Machine à check-in', d:'60 check-ins', ok:ci>=60},
     {n:'Première séance', d:'1 séance terminée', ok:done>=1},
     {n:'Machine', d:'10 séances', ok:done>=10},
+    {n:'Perfectionniste', d:'50 séances', ok:done>=50},
     {n:'Coureur', d:'1re sortie', ok:runs>=1},
     {n:'Fondeur', d:'42 km cumulés', ok:totalKm>=42},
+    {n:'Marathonien', d:'100 km cumulés', ok:totalKm>=100},
+    {n:'Programmé', d:'Programme muscu lancé', ok:!!S.muscu},
+    {n:'Discipline', d:'20 séances muscu du programme', ok:muscuDone>=20},
+    {n:'Plan tracé', d:'Plan course créé', ok:!!S.runPlan},
+    {n:'Sur les rails', d:'10 séances du plan course', ok:runDone>=10},
     {n:'Transformation', d:'-2 kg', ok:delta<=-2}
   ];
+}
+function computePoints(){
+  var done=(S.history||[]).filter(function(w){return w.status==='realisee';}).length;
+  var ci=S.checkinCount||0;
+  var runs=(S.runs||[]).length;
+  var km=Math.round((S.runs||[]).reduce(function(a,r){return a+(Number(r.distance_km)||0);},0));
+  var badges=computeBadges().filter(function(b){return b.ok;}).length;
+  var muscuDone=S.muscu?(S.muscu.days||[]).filter(function(d){return d.done;}).length:0;
+  var runDone=S.runPlan?S.runPlan.weeks.reduce(function(a,wk){return a+wk.sessions.filter(function(s){return s.done;}).length;},0):0;
+  return ci*2 + done*10 + runs*8 + km + badges*15 + muscuDone*10 + runDone*8;
+}
+async function loadLeaderboard(){
+  try{ var r=await db.from('leaderboard_points').select('*').order('points',{ascending:false}).limit(100); S.leaderboard=r.data||[]; }catch(_){ S.leaderboard=[]; }
+  render();
+}
+function scrLeaderboard(){
+  var tb='<div class="tbar"><button class="ic" onclick="go(\'dash\')"><i class="ti ti-chevron-left"></i></button><h2 style="font-size:19px">Classement</h2><span style="width:38px"></span></div>';
+  if(S.leaderboard===null){ loadLeaderboard(); return tb+'<div class="center" style="min-height:200px"><div class="spin" style="border-color:var(--accent);border-top-color:transparent;width:28px;height:28px"></div><div>Chargement du classement…</div></div>'; }
+  var lb=S.leaderboard||[];
+  var intro='<div class="banner" style="background:var(--accent-soft)"><i class="ti ti-crown" style="color:var(--accent)"></i><div class="x" style="color:#1742a5">Gagne des points en faisant tes check-ins, tes séances, tes sorties et en débloquant des badges. Seuls le prénom et les points sont visibles.</div></div>';
+  if(!lb.length) return tb+intro+'<div class="card flat" style="text-align:center;padding:22px"><div class="sub">Le classement se remplira dès que toi et tes athlètes utiliserez l\'app.</div></div><button class="btn outline" onclick="loadLeaderboard()"><i class="ti ti-refresh"></i> Rafraîchir</button>';
+  var rows=lb.map(function(x,i){ var me=x.athlete_id===S.user.id; var rank=i===0?'🥇':(i===1?'🥈':(i===2?'🥉':String(i+1))); return '<div class="ex" style="'+(me?'background:var(--accent-soft);border-radius:10px;padding-left:8px;padding-right:8px':'')+'"><div class="n" style="background:transparent;font-size:16px">'+rank+'</div><div class="m"><div class="nm">'+esc(x.first_name||'Athlète')+(me?' (toi)':'')+'</div></div><span class="pill o">'+(x.points||0)+' pts</span></div>'; }).join('');
+  return tb+intro+'<div class="card" style="padding:6px 14px">'+rows+'</div><button class="btn outline" onclick="loadLeaderboard()"><i class="ti ti-refresh"></i> Rafraîchir</button>';
 }
 function scrBadges(){
   var tb='<div class="tbar"><button class="ic" onclick="go(\'dash\')"><i class="ti ti-chevron-left"></i></button><h2 style="font-size:19px">Mes badges</h2><span style="width:38px"></span></div>';
@@ -644,6 +683,7 @@ async function doReport(){
   catch(e){ S.report='Erreur : '+(e.message||e); }
   S.reportLoading=false; render();
 }
+/* ===== PLAN COURSE (progressif, guidé pas à pas) ===== */
 function runTypeLabel(t){ return ({EF:'Endurance fondamentale',FRAC:'Fractionné',LONG:'Sortie longue',RECUP:'Récupération',MC:'Marche / course'})[t]||'Sortie'; }
 function runTypeBg(t){ return t==='FRAC'?'var(--amber-bg)':(t==='LONG'?'var(--green-bg)':(t==='RECUP'?'var(--green-bg)':'var(--accent-soft)')); }
 function runTypeCol(t){ return t==='FRAC'?'var(--amber)':(t==='LONG'?'var(--green)':(t==='RECUP'?'var(--green)':'var(--accent)')); }
@@ -789,6 +829,7 @@ function runUpcomingCard(){
   var rows=up.map(function(it){var d=new Date(it.date+'T00:00:00');var ds=isNaN(d)?it.date:d.toLocaleDateString('fr-FR',{weekday:'short',day:'numeric',month:'short'});var ck=it.done?'<i class="ti ti-circle-check" style="color:var(--green);font-size:18px"></i>':'<i class="ti ti-chevron-right" style="color:var(--faint);font-size:16px"></i>';return '<div class="ex" onclick="openRunSession('+it.wi+','+it.si+')" style="cursor:pointer"><div class="n" style="background:'+runTypeBg(it.t)+';color:'+runTypeCol(it.t)+'"><i class="ti ti-run"></i></div><div class="m"><div class="nm">'+ds+' · '+runTypeLabel(it.t)+'</div><div class="ds">'+esc(it.m)+'</div></div>'+ck+'</div>';}).join('');
   return '<div class="label" style="margin:4px 2px 8px">Plan course — à venir</div><div class="card" style="padding:6px 14px">'+rows+'</div>';
 }
+/* ===== PROGRAMME MUSCU multi-semaines (adaptatif, éditable) ===== */
 function muscuEquipTier(eq){ eq=(eq||'').toLowerCase();
   if(eq.indexOf('complète')>=0||eq.indexOf('basique')>=0||eq.indexOf('salle')>=0) return 'full';
   if(eq.indexOf('maison')>=0||eq.indexOf('haltère')>=0||eq.indexOf('barre')>=0) return 'home';
@@ -956,7 +997,7 @@ function render(extra){
   if(S.screen==='login'){ html=scrLogin(); nav.style.display='none'; }
   else if(S.screen==='result'){ html=scrResult(extra); nav.style.display='flex'; nav.innerHTML=navBar(); }
   else { nav.style.display='flex'; nav.innerHTML=navBar();
-    html = S.screen==='checkin'?scrCheckin():(S.screen==='workout'?scrWorkout():(S.screen==='profile'?scrProfile():(S.screen==='genopts'?scrGenOptions():(S.screen==='charges'?scrCharges():(S.screen==='calendar'?scrCalendar():(S.screen==='coach'?scrCoach():(S.screen==='coachDetail'?scrCoachDetail():(S.screen==='nutrition'?scrNutrition():(S.screen==='runs'?scrRuns():(S.screen==='badges'?scrBadges():(S.screen==='feedback'?scrFeedback():(S.screen==='comps'?scrComps():(S.screen==='assistant'?scrAssistant():(S.screen==='report'?scrReport():(S.screen==='runplanopts'?scrRunPlanOpts():(S.screen==='runsession'?scrRunSession():(S.screen==='newathlete'?scrNewAthlete():(S.screen==='athleteEdit'?scrAthleteEdit():(S.screen==='muscu'?scrMuscu():(S.screen==='muscuopts'?scrMuscuOpts():(S.screen==='muscuday'?scrMuscuDay():scrDash())))))))))))))))))))));
+    html = S.screen==='checkin'?scrCheckin():(S.screen==='workout'?scrWorkout():(S.screen==='profile'?scrProfile():(S.screen==='genopts'?scrGenOptions():(S.screen==='charges'?scrCharges():(S.screen==='calendar'?scrCalendar():(S.screen==='coach'?scrCoach():(S.screen==='coachDetail'?scrCoachDetail():(S.screen==='nutrition'?scrNutrition():(S.screen==='runs'?scrRuns():(S.screen==='badges'?scrBadges():(S.screen==='feedback'?scrFeedback():(S.screen==='comps'?scrComps():(S.screen==='assistant'?scrAssistant():(S.screen==='report'?scrReport():(S.screen==='runplanopts'?scrRunPlanOpts():(S.screen==='runsession'?scrRunSession():(S.screen==='newathlete'?scrNewAthlete():(S.screen==='athleteEdit'?scrAthleteEdit():(S.screen==='muscu'?scrMuscu():(S.screen==='muscuopts'?scrMuscuOpts():(S.screen==='muscuday'?scrMuscuDay():(S.screen==='leaderboard'?scrLeaderboard():scrDash()))))))))))))))))))))));
   }
   sc.innerHTML=html; sc.scrollTop=0; S.msg=null;
   const e=document.getElementById('i-email'); if(e) e.addEventListener('keydown',ev=>{if(ev.key==='Enter')document.getElementById('i-pass').focus();});
