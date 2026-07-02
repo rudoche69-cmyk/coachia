@@ -85,7 +85,7 @@ const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 if ('serviceWorker' in navigator) { window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); }); }
 try{ var __th=localStorage.getItem('coachia-theme'); if(__th) document.documentElement.setAttribute('data-theme',__th); }catch(e){}
 
-const S = { screen:'login', user:null, profile:null, todayCheckin:null, todayScore:null, weights:[], lifts:[], chargeExo:null, history:[], athletes:[], selAthlete:null, selAthleteProfile:null, coachBusy:false, selWeights:[], nutrition:null, meals:[], genNut:false, runs:[], checkinCount:0, comps:[], chat:[], aiThinking:false, report:null, reportLoading:false, runPlan:null, selRun:null, muscu:null, selMuscuDay:null, calY:null, calM:null, calSel:null, workout:null, exercises:[], started:false, generating:false, msg:null };
+const S = { screen:'login', user:null, profile:null, todayCheckin:null, todayScore:null, weights:[], lifts:[], chargeExo:null, history:[], athletes:[], selAthlete:null, selAthleteProfile:null, coachBusy:false, selWeights:[], nutrition:null, meals:[], genNut:false, foodLog:[], runs:[], checkinCount:0, comps:[], chat:[], aiThinking:false, report:null, reportLoading:false, runPlan:null, selRun:null, muscu:null, selMuscuDay:null, calY:null, calM:null, calSel:null, workout:null, exercises:[], started:false, generating:false, msg:null };
 const today = () => new Date().toISOString().slice(0,10);
 
 function computeScore(c){
@@ -129,6 +129,7 @@ async function loadAll(){
   try{ const lr = await db.from('workout_exercises').select('name,actual_load,workouts!inner(date,athlete_id)').eq('workouts.athlete_id',uid).not('actual_load','is',null); S.lifts=(lr.data||[]).map(function(r){return {name:r.name,load:Number(r.actual_load),date:(r.workouts&&r.workouts.date)||''};}).sort(function(a,b){return a.date<b.date?-1:1;}); }catch(_){ S.lifts=[]; }
   S.started = !!(wk && wk.status==='realisee');
   try{ const npr = await db.from('nutrition_plans').select('*').eq('athlete_id',uid).order('created_at',{ascending:false}).limit(1).maybeSingle(); S.nutrition=npr.data||null; if(S.nutrition){ const mr=await db.from('meals').select('*').eq('plan_id',S.nutrition.id); S.meals=mr.data||[]; } else { S.meals=[]; } }catch(_){ S.nutrition=null; S.meals=[]; }
+  try{ const fr2=await db.from('food_entries').select('*').eq('athlete_id',uid).eq('date',today()).order('created_at',{ascending:true}); S.foodLog=fr2.data||[]; }catch(_){ S.foodLog=[]; }
   try{ const rn=await db.from('runs').select('*').eq('athlete_id',uid).order('date',{ascending:false}).limit(60); S.runs=rn.data||[]; }catch(_){ S.runs=[]; }
   try{ const cc=await db.from('daily_checkins').select('id',{count:'exact',head:true}).eq('athlete_id',uid); S.checkinCount=cc.count||0; }catch(_){ S.checkinCount=0; }
   try{ const cp=await db.from('competitions').select('*').eq('athlete_id',uid); S.comps=cp.data||[]; }catch(_){ S.comps=[]; }
@@ -460,9 +461,36 @@ function scrNutrition(){
   function macro(lab,val,col,max){ var pct=Math.min(100,Math.round((Number(val||0)/max)*100)); return '<div class="macro"><div class="row"><span class="sub">'+lab+'</span><span class="sub" style="font-weight:700;color:var(--ink)">'+(val||0)+' g</span></div><div class="bar"><i style="width:'+pct+'%;background:'+col+'"></i></div></div>'; }
   var head='<div class="card" style="display:flex;gap:14px;align-items:center"><div class="ring" style="background:var(--accent-soft)"><span style="font-size:18px;font-weight:800;color:var(--accent)">'+(n.calories||'—')+'</span><span style="font-size:10px;color:var(--accent);font-weight:700">kcal</span></div><div style="flex:1">'+macro('Protéines',n.protein,'var(--accent)',250)+macro('Glucides',n.carbs,'var(--green)',400)+macro('Lipides',n.fat,'var(--amber)',120)+'</div></div>';
   var hyd=n.hydration?'<div class="card flat row" style="padding:12px 14px"><div class="row" style="gap:9px"><i class="ti ti-droplet" style="color:var(--accent);font-size:18px"></i><span class="sub" style="color:var(--ink);font-weight:700">Hydratation</span></div><span class="sub" style="font-weight:700;color:var(--ink)">'+esc(n.hydration)+'</span></div>':'';
-  var list=meals.map(function(m){ var v=(m.calories?m.calories+'<br>kcal':''); return '<div class="ex"><div class="n"><i class="ti ti-tools-kitchen-2"></i></div><div class="m"><div class="nm">'+esc(m.moment||'Repas')+'</div><div class="ds">'+esc(m.items||'')+'</div></div><div class="v">'+v+'</div></div>'; }).join('');
-  return tb+msg+head+hyd+'<div class="card" style="padding:6px 14px">'+list+'</div><button class="btn outline" onclick="doGenNutrition()"><i class="ti ti-refresh"></i> Régénérer ma nutrition</button>';
+  var list=meals.map(function(m,mi){ var v=(m.calories?m.calories+'<br>kcal':''); return '<div class="ex"><div class="n"><i class="ti ti-tools-kitchen-2"></i></div><div class="m"><div class="nm">'+esc(m.moment||'Repas')+'</div><div class="ds">'+esc(m.items||'')+'</div><span onclick="doAddMealToLog('+mi+')" style="display:inline-block;margin-top:6px;font-size:11px;font-weight:700;color:var(--accent);cursor:pointer">+ Ajouter au suivi</span></div><div class="v">'+v+'</div></div>'; }).join('');
+  var tot=foodTotals();
+  var tracker='<div class="card"><div class="row" style="margin-bottom:8px"><div class="label">Suivi du jour</div><span class="sub">consommé / objectif</span></div>'+
+    trackBar('Calories (kcal)',tot.calories,n.calories,'var(--accent)')+
+    trackBar('Protéines (g)',tot.protein,n.protein,'var(--accent)')+
+    trackBar('Glucides (g)',tot.carbs,n.carbs,'var(--green)')+
+    trackBar('Lipides (g)',tot.fat,n.fat,'var(--amber)')+'</div>';
+  var addForm='<div class="card"><div class="flabel">Ajouter un aliment / repas</div><input id="fd-name" class="in" type="text" placeholder="Nom (ex : Poulet + riz)"><div class="row" style="gap:6px;margin-top:7px"><input id="fd-cal" class="in" type="number" placeholder="kcal" style="margin-top:0"><input id="fd-p" class="in" type="number" placeholder="P" style="margin-top:0"><input id="fd-c" class="in" type="number" placeholder="G" style="margin-top:0"><input id="fd-f" class="in" type="number" placeholder="L" style="margin-top:0"></div><button class="btn" onclick="doAddFood()" style="margin-top:10px">Ajouter au suivi</button></div>';
+  var entries=S.foodLog||[];
+  var elist=entries.length?('<div class="label" style="margin:6px 2px 8px">Mes aliments du jour</div><div class="card" style="padding:6px 14px">'+entries.map(function(f){ return '<div class="ex"><div class="m"><div class="nm">'+esc(f.name||'Aliment')+'</div><div class="ds">'+(f.calories||0)+' kcal · P '+(f.protein||0)+' · G '+(f.carbs||0)+' · L '+(f.fat||0)+'</div></div><span onclick="doDelFood(\''+f.id+'\')" style="cursor:pointer;color:var(--red);font-weight:700;font-size:20px;padding:0 4px">×</span></div>'; }).join('')+'</div>'):'';
+  return tb+msg+tracker+addForm+elist+'<div class="label" style="margin:10px 2px 8px">Mon plan conseillé</div>'+head+hyd+'<div class="card" style="padding:6px 14px">'+list+'</div><button class="btn outline" onclick="doGenNutrition()"><i class="ti ti-refresh"></i> Régénérer ma nutrition</button>';
 }
+function foodTotals(){ var t={calories:0,protein:0,carbs:0,fat:0}; (S.foodLog||[]).forEach(function(f){ t.calories+=Number(f.calories)||0; t.protein+=Number(f.protein)||0; t.carbs+=Number(f.carbs)||0; t.fat+=Number(f.fat)||0; }); return t; }
+function trackBar(lab,cons,tar,col){ var pct=tar?Math.min(100,Math.round(cons/tar*100)):0; var over=tar&&cons>tar; return '<div class="macro"><div class="row"><span class="sub">'+lab+'</span><span class="sub" style="font-weight:700;color:'+(over?'var(--amber)':'var(--ink)')+'">'+cons+' / '+(tar||'—')+'</span></div><div class="bar"><i style="width:'+pct+'%;background:'+col+'"></i></div></div>'; }
+async function loadFood(){ try{ var r=await db.from('food_entries').select('*').eq('athlete_id',S.user.id).eq('date',today()).order('created_at',{ascending:true}); S.foodLog=r.data||[]; }catch(_){ S.foodLog=[]; } }
+async function doAddFood(){
+  var g=function(id){var e=document.getElementById(id);return e?e.value.trim():'';};
+  var name=g('fd-name'); var cal=parseInt(g('fd-cal'))||0; var p=parseInt(g('fd-p'))||0; var c=parseInt(g('fd-c'))||0; var f=parseInt(g('fd-f'))||0;
+  if(!name && !cal){ S.msg={k:'err',t:'Indique au moins un nom ou des calories.'}; render(); return; }
+  try{ await db.from('food_entries').insert({athlete_id:S.user.id,date:today(),name:name||'Aliment',calories:cal,protein:p,carbs:c,fat:f}); await loadFood(); S.msg={k:'ok',t:'Ajouté au suivi.'}; }
+  catch(e){ S.msg={k:'err',t:'Erreur : '+(e.message||e)+' (la table food_entries est-elle créée ?)'}; }
+  render();
+}
+async function doAddMealToLog(mi){
+  var m=(S.meals||[])[mi]; if(!m) return;
+  try{ await db.from('food_entries').insert({athlete_id:S.user.id,date:today(),name:m.moment||'Repas',calories:Number(m.calories)||0,protein:Number(m.protein)||0,carbs:Number(m.carbs)||0,fat:Number(m.fat)||0}); await loadFood(); S.msg={k:'ok',t:esc(m.moment||'Repas')+' ajouté au suivi.'}; }
+  catch(e){ S.msg={k:'err',t:'Erreur : '+(e.message||e)}; }
+  render();
+}
+async function doDelFood(id){ try{ await db.from('food_entries').delete().eq('id',id); await loadFood(); }catch(e){} render(); }
 async function doGenNutrition(){
   S.genNut=true; S.screen='nutrition'; render();
   try{
@@ -616,7 +644,6 @@ async function doReport(){
   catch(e){ S.report='Erreur : '+(e.message||e); }
   S.reportLoading=false; render();
 }
-/* ===== PLAN COURSE (progressif, guidé pas à pas) ===== */
 function runTypeLabel(t){ return ({EF:'Endurance fondamentale',FRAC:'Fractionné',LONG:'Sortie longue',RECUP:'Récupération',MC:'Marche / course'})[t]||'Sortie'; }
 function runTypeBg(t){ return t==='FRAC'?'var(--amber-bg)':(t==='LONG'?'var(--green-bg)':(t==='RECUP'?'var(--green-bg)':'var(--accent-soft)')); }
 function runTypeCol(t){ return t==='FRAC'?'var(--amber)':(t==='LONG'?'var(--green)':(t==='RECUP'?'var(--green)':'var(--accent)')); }
@@ -762,7 +789,6 @@ function runUpcomingCard(){
   var rows=up.map(function(it){var d=new Date(it.date+'T00:00:00');var ds=isNaN(d)?it.date:d.toLocaleDateString('fr-FR',{weekday:'short',day:'numeric',month:'short'});var ck=it.done?'<i class="ti ti-circle-check" style="color:var(--green);font-size:18px"></i>':'<i class="ti ti-chevron-right" style="color:var(--faint);font-size:16px"></i>';return '<div class="ex" onclick="openRunSession('+it.wi+','+it.si+')" style="cursor:pointer"><div class="n" style="background:'+runTypeBg(it.t)+';color:'+runTypeCol(it.t)+'"><i class="ti ti-run"></i></div><div class="m"><div class="nm">'+ds+' · '+runTypeLabel(it.t)+'</div><div class="ds">'+esc(it.m)+'</div></div>'+ck+'</div>';}).join('');
   return '<div class="label" style="margin:4px 2px 8px">Plan course — à venir</div><div class="card" style="padding:6px 14px">'+rows+'</div>';
 }
-/* ===== PROGRAMME MUSCU multi-semaines (adaptatif, éditable) ===== */
 function muscuEquipTier(eq){ eq=(eq||'').toLowerCase();
   if(eq.indexOf('complète')>=0||eq.indexOf('basique')>=0||eq.indexOf('salle')>=0) return 'full';
   if(eq.indexOf('maison')>=0||eq.indexOf('haltère')>=0||eq.indexOf('barre')>=0) return 'home';
