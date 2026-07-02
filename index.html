@@ -366,7 +366,36 @@ function scrCoach(){
   var g=a.filter(function(x){return lv(x)==='vert';}).length,o=a.filter(function(x){return lv(x)==='orange';}).length,r=a.filter(function(x){return lv(x)==='rouge';}).length;
   var counts='<div class="row" style="gap:8px;margin-bottom:12px"><div class="card flat" style="flex:1;margin:0;text-align:center;padding:11px"><div class="big" style="font-size:21px;color:var(--green)">'+g+'</div><div class="label">Au vert</div></div><div class="card flat" style="flex:1;margin:0;text-align:center;padding:11px"><div class="big" style="font-size:21px;color:var(--amber)">'+o+'</div><div class="label">Vigilance</div></div><div class="card flat" style="flex:1;margin:0;text-align:center;padding:11px"><div class="big" style="font-size:21px;color:var(--red)">'+r+'</div><div class="label">À risque</div></div></div>';
   var rows=a.map(function(x){ var l=lv(x); var dot=l?'<span class="dot '+(l==='vert'?'g':(l==='orange'?'o':'r'))+'"></span>':'<span class="sub" style="font-size:11px">—</span>'; var init=((x.first_name||'?').charAt(0)||'?').toUpperCase(); return '<div class="ath" onclick="openAthlete(\''+x.id+'\')" style="cursor:pointer"><div class="av">'+esc(init)+'</div><div class="m"><div class="nm">'+esc(((x.first_name||'')+' '+(x.last_name||'')).trim()||'Athlète')+'</div><div class="ds">'+esc(x.main_goal||'Objectif non défini')+'</div></div>'+dot+'</div>'; }).join('');
-  return tb+msg+createBtn+counts+'<div class="card" style="padding:4px 14px">'+rows+'</div>';
+  return tb+msg+createBtn+'<button class="btn outline" onclick="go(\'groupsession\')" style="margin-bottom:13px"><i class="ti ti-users-group"></i> Séance de groupe (synchronisée)</button>'+counts+'<div class="card" style="padding:4px 14px">'+rows+'</div>';
+}
+function scrGroupSession(){
+  var tb='<div class="tbar"><button class="ic" onclick="go(\'coach\')"><i class="ti ti-chevron-left"></i></button><h2 style="font-size:19px">Séance de groupe</h2><span style="width:38px"></span></div>';
+  var msg=S.msg?'<div class="msg '+S.msg.k+'">'+S.msg.t+'</div>':'';
+  if(!S.workout){
+    return tb+msg+'<div class="banner" style="background:var(--accent-soft)"><i class="ti ti-info-circle" style="color:var(--accent)"></i><div class="x" style="color:#1742a5">Génère d\'abord TA séance du jour (onglet Séance) : elle servira de modèle commun, puis tu la diffuseras au groupe.</div></div><button class="btn" onclick="go(\'genopts\')"><i class="ti ti-sparkles"></i> Générer la séance modèle</button>';
+  }
+  var a=S.athletes||[];
+  var head='<div class="card"><div class="label">Séance à diffuser</div><div style="font-weight:700;margin-top:4px">'+esc(S.workout.type||'Séance')+'</div><div class="sub">'+esc(S.workout.objective||'')+' · '+(S.exercises||[]).length+' exercices</div></div>';
+  var info='<div class="banner" style="background:var(--accent-soft)"><i class="ti ti-broadcast" style="color:var(--accent)"></i><div class="x" style="color:#1742a5">Chaque athlète coché reçoit une <b>copie identique</b> de cette séance pour aujourd\'hui, et saisit <b>ses propres charges</b> de son côté.</div></div>';
+  var listRows=a.length?a.map(function(x){ var nm=esc(((x.first_name||'')+' '+(x.last_name||'')).trim()||'Athlète'); return '<label class="ex" style="cursor:pointer"><input type="checkbox" class="grp-cb" value="'+x.id+'" style="width:20px;height:20px;accent-color:var(--accent);flex:0 0 auto"><div class="m"><div class="nm">'+nm+'</div><div class="ds">'+esc(x.main_goal||'')+'</div></div></label>'; }).join(''):'<div class="sub" style="padding:10px 0">Aucun athlète. Crée des comptes athlètes d\'abord.</div>';
+  return tb+msg+head+info+'<div class="card" style="padding:6px 14px">'+listRows+'</div>'+(a.length?'<button class="btn" onclick="doGroupSession()"><i class="ti ti-broadcast"></i> Diffuser à la sélection</button>':'');
+}
+async function doGroupSession(){
+  if(!S.workout) return;
+  var cbs=document.querySelectorAll('.grp-cb'); var ids=[]; for(var j=0;j<cbs.length;j++){ if(cbs[j].checked) ids.push(cbs[j].value); }
+  if(!ids.length){ S.msg={k:'err',t:'Sélectionne au moins un athlète.'}; render(); return; }
+  var wk=S.workout; var ok=0;
+  for(var i=0;i<ids.length;i++){
+    try{
+      var ins=await db.from('workouts').insert({athlete_id:ids[i], date:today(), type:wk.type||'Séance', objective:wk.objective||null, estimated_duration:wk.estimated_duration||null, warmup:wk.warmup||null, cooldown:wk.cooldown||null, status:'prevue', generated_by_ai:true}).select().single();
+      if(ins.data){
+        var rows=(S.exercises||[]).map(function(e,idx){ return {workout_id:ins.data.id, position:idx+1, name:e.name||'Exercice', sets:e.sets||null, reps:e.reps!=null?String(e.reps):null, load:e.load||null, rest:e.rest||null, rpe:e.rpe||null, notes:e.notes||null}; });
+        if(rows.length) await db.from('workout_exercises').insert(rows);
+        ok++;
+      }
+    }catch(_){}
+  }
+  S.msg={k: ok?'ok':'err', t: ok?('Séance diffusée à '+ok+' athlète(s) ✅ — chacun peut maintenant saisir ses charges.'):'Diffusion impossible. As-tu lancé la commande SQL des droits de groupe ?'}; render();
 }
 async function openAthlete(id){
   S.selAthlete=null; S.selAthleteProfile=null;
@@ -997,7 +1026,7 @@ function render(extra){
   if(S.screen==='login'){ html=scrLogin(); nav.style.display='none'; }
   else if(S.screen==='result'){ html=scrResult(extra); nav.style.display='flex'; nav.innerHTML=navBar(); }
   else { nav.style.display='flex'; nav.innerHTML=navBar();
-    html = S.screen==='checkin'?scrCheckin():(S.screen==='workout'?scrWorkout():(S.screen==='profile'?scrProfile():(S.screen==='genopts'?scrGenOptions():(S.screen==='charges'?scrCharges():(S.screen==='calendar'?scrCalendar():(S.screen==='coach'?scrCoach():(S.screen==='coachDetail'?scrCoachDetail():(S.screen==='nutrition'?scrNutrition():(S.screen==='runs'?scrRuns():(S.screen==='badges'?scrBadges():(S.screen==='feedback'?scrFeedback():(S.screen==='comps'?scrComps():(S.screen==='assistant'?scrAssistant():(S.screen==='report'?scrReport():(S.screen==='runplanopts'?scrRunPlanOpts():(S.screen==='runsession'?scrRunSession():(S.screen==='newathlete'?scrNewAthlete():(S.screen==='athleteEdit'?scrAthleteEdit():(S.screen==='muscu'?scrMuscu():(S.screen==='muscuopts'?scrMuscuOpts():(S.screen==='muscuday'?scrMuscuDay():(S.screen==='leaderboard'?scrLeaderboard():scrDash()))))))))))))))))))))));
+    html = S.screen==='checkin'?scrCheckin():(S.screen==='workout'?scrWorkout():(S.screen==='profile'?scrProfile():(S.screen==='genopts'?scrGenOptions():(S.screen==='charges'?scrCharges():(S.screen==='calendar'?scrCalendar():(S.screen==='coach'?scrCoach():(S.screen==='coachDetail'?scrCoachDetail():(S.screen==='nutrition'?scrNutrition():(S.screen==='runs'?scrRuns():(S.screen==='badges'?scrBadges():(S.screen==='feedback'?scrFeedback():(S.screen==='comps'?scrComps():(S.screen==='assistant'?scrAssistant():(S.screen==='report'?scrReport():(S.screen==='runplanopts'?scrRunPlanOpts():(S.screen==='runsession'?scrRunSession():(S.screen==='newathlete'?scrNewAthlete():(S.screen==='athleteEdit'?scrAthleteEdit():(S.screen==='muscu'?scrMuscu():(S.screen==='muscuopts'?scrMuscuOpts():(S.screen==='muscuday'?scrMuscuDay():(S.screen==='leaderboard'?scrLeaderboard():(S.screen==='groupsession'?scrGroupSession():scrDash())))))))))))))))))))))));
   }
   sc.innerHTML=html; sc.scrollTop=0; S.msg=null;
   const e=document.getElementById('i-email'); if(e) e.addEventListener('keydown',ev=>{if(ev.key==='Enter')document.getElementById('i-pass').focus();});
