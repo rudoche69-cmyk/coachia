@@ -713,6 +713,7 @@ async function doReport(){
   catch(e){ S.report='Erreur : '+(e.message||e); }
   S.reportLoading=false; render();
 }
+/* ===== PLAN COURSE (progressif, guidé pas à pas) ===== */
 function runTypeLabel(t){ return ({EF:'Endurance fondamentale',FRAC:'Fractionné',LONG:'Sortie longue',RECUP:'Récupération',MC:'Marche / course'})[t]||'Sortie'; }
 function runTypeBg(t){ return t==='FRAC'?'var(--amber-bg)':(t==='LONG'?'var(--green-bg)':(t==='RECUP'?'var(--green-bg)':'var(--accent-soft)')); }
 function runTypeCol(t){ return t==='FRAC'?'var(--amber)':(t==='LONG'?'var(--green)':(t==='RECUP'?'var(--green)':'var(--accent)')); }
@@ -858,6 +859,7 @@ function runUpcomingCard(){
   var rows=up.map(function(it){var d=new Date(it.date+'T00:00:00');var ds=isNaN(d)?it.date:d.toLocaleDateString('fr-FR',{weekday:'short',day:'numeric',month:'short'});var ck=it.done?'<i class="ti ti-circle-check" style="color:var(--green);font-size:18px"></i>':'<i class="ti ti-chevron-right" style="color:var(--faint);font-size:16px"></i>';return '<div class="ex" onclick="openRunSession('+it.wi+','+it.si+')" style="cursor:pointer"><div class="n" style="background:'+runTypeBg(it.t)+';color:'+runTypeCol(it.t)+'"><i class="ti ti-run"></i></div><div class="m"><div class="nm">'+ds+' · '+runTypeLabel(it.t)+'</div><div class="ds">'+esc(it.m)+'</div></div>'+ck+'</div>';}).join('');
   return '<div class="label" style="margin:4px 2px 8px">Plan course — à venir</div><div class="card" style="padding:6px 14px">'+rows+'</div>';
 }
+/* ===== PROGRAMME MUSCU multi-semaines (adaptatif, éditable) ===== */
 function muscuEquipTier(eq){ eq=(eq||'').toLowerCase();
   if(eq.indexOf('complète')>=0||eq.indexOf('basique')>=0||eq.indexOf('salle')>=0) return 'full';
   if(eq.indexOf('maison')>=0||eq.indexOf('haltère')>=0||eq.indexOf('barre')>=0) return 'home';
@@ -1015,6 +1017,7 @@ async function doToggleMuscuDone(){
   try{ await db.from('profiles').update({muscu_program:S.muscu}).eq('id',S.user.id); if(S.profile)S.profile.muscu_program=S.muscu; }catch(e){}
   render();
 }
+/* ===== PROGRAMME COMPLET (muscu + course couplés selon l'objectif) ===== */
 function weekSlots(n){ return [[0],[0,3],[0,2,4],[0,2,4,6],[0,1,3,4,6],[0,1,2,4,5,6]][Math.min(Math.max(n,1),6)-1]; }
 function objectiveSplit(goal,N){
   var g=(goal||'').toLowerCase();
@@ -1034,10 +1037,11 @@ function unifiedCourseMain(t,w){
   if(t==='LONG') return (40+Math.min(w*3,30))+' min en allure tranquille (sortie longue).';
   return '30 min de footing.';
 }
-function buildUnifiedProgram(goal,N,weeks,equip,start){
+function buildUnifiedProgram(goal,offsets,weeks,equip,start){
   start=nextMonday(start);
+  var N=offsets.length;
   var split=objectiveSplit(goal,N);
-  var slots=weekSlots(N);
+  var slots=offsets.slice().sort(function(a,b){return a-b;});
   var types=[]; var m=split.muscu, c=split.course;
   for(var i=0;i<N;i++){ if(i%2===0){ if(c>0){types.push('course');c--;} else {types.push('muscu');m--;} } else { if(m>0){types.push('muscu');m--;} else {types.push('course');c--;} } }
   var muscuOffs=[], courseOffs=[];
@@ -1068,10 +1072,11 @@ function scrProgramOpts(){
   var tb='<div class="tbar"><button class="ic" onclick="go(\'dash\')"><i class="ti ti-chevron-left"></i></button><h2 style="font-size:19px">Programme complet</h2><span style="width:38px"></span></div>';
   var goals=['Hyrox Solo','Hyrox Double','Football','Running','Courir plus vite','Trail','Marathon','Semi-marathon','Spartan Race','Cross Training','Musculation','Force','Hypertrophie','Explosivité','Perte de poids','Recomposition corporelle','Prise de masse','Prise de masse musculaire','Santé'].map(function(x){return [x,x];});
   var eq=[['Salle de sport complète','Salle de sport complète'],['Salle de sport (basique)','Salle de sport (basique)'],['Matériel maison (haltères/barre)','Matériel maison (haltères/barre)'],['Petit matériel (élastiques, kettlebell)','Petit matériel (élastiques, kettlebell)'],['Sans matériel (poids du corps)','Sans matériel (poids du corps)']];
-  var wopt=''; for(var i=2;i<=6;i++){ wopt+='<option value="'+i+'"'+(i===4?' selected':'')+'>'+i+' séances / semaine</option>'; }
-  return tb+'<div class="banner" style="background:var(--accent-soft)"><i class="ti ti-wand" style="color:var(--accent)"></i><div class="x" style="color:#1742a5">Un seul programme qui combine <b>muscu + course</b> selon ton objectif et le nombre de séances dispo. L\'app répartit tout sur ton planning. Tu pourras toujours générer une <b>séance bonus</b> (onglet Séance) un jour libre.</div></div>'+
+  var dayNames=['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
+  var dayRow=dayNames.map(function(dn,idx){ var def=(idx===0||idx===2||idx===4)?' checked':''; return '<label style="flex:1;text-align:center;font-size:11px;font-weight:700;color:var(--muted)"><input type="checkbox" class="up-day" value="'+idx+'"'+def+' style="display:block;margin:0 auto 4px;width:18px;height:18px;accent-color:var(--accent)">'+dn+'</label>'; }).join('');
+  return tb+'<div class="banner" style="background:var(--accent-soft)"><i class="ti ti-wand" style="color:var(--accent)"></i><div class="x" style="color:#1742a5">Un seul programme qui combine <b>muscu + course</b> selon ton objectif et les jours où tu t\'entraînes. L\'app répartit tout sur ton planning. Tu pourras toujours générer une <b>séance bonus</b> (onglet Séance) un jour libre.</div></div>'+
     selField('up-goal','Mon objectif',p.main_goal,goals)+
-    '<div class="card"><div class="flabel">Combien de séances par semaine au total ?</div><select class="in" id="up-week">'+wopt+'</select></div>'+
+    '<div class="card"><div class="flabel">Mes jours d\'entraînement (coche tes jours)</div><div class="row" style="gap:4px;margin-top:9px">'+dayRow+'</div></div>'+
     '<div class="card"><div class="flabel">Durée du programme</div><select class="in" id="up-weeks"><option value="4">4 semaines</option><option value="6" selected>6 semaines</option><option value="8">8 semaines</option></select></div>'+
     selField('up-equip','Matériel disponible',p.available_equipment,eq)+
     '<div class="card"><div class="flabel">Date de début (démarre le lundi suivant)</div><input id="up-start" class="in" type="date" value="'+today()+'"></div>'+
@@ -1079,11 +1084,12 @@ function scrProgramOpts(){
 }
 async function doCreateUnified(){
   var goalEl=document.getElementById('up-goal'); var goal=(goalEl&&goalEl.value)||(S.profile&&S.profile.main_goal)||'Forme';
-  var N=parseInt(document.getElementById('up-week').value)||4;
+  var dayEls=document.querySelectorAll('.up-day'); var offs=[]; for(var i=0;i<dayEls.length;i++){ if(dayEls[i].checked) offs.push(parseInt(dayEls[i].value)); }
+  if(!offs.length){ S.msg={k:'err',t:'Choisis au moins un jour d\'entraînement.'}; render(); return; }
   var weeks=parseInt(document.getElementById('up-weeks').value)||6;
   var eqEl=document.getElementById('up-equip'); var equip=(eqEl&&eqEl.value)||(S.profile&&S.profile.available_equipment)||'Salle de sport (basique)';
   var start=document.getElementById('up-start').value||today();
-  var prog=buildUnifiedProgram(goal,N,weeks,equip,start);
+  var prog=buildUnifiedProgram(goal,offs,weeks,equip,start);
   try{
     var upd={ muscu_program:prog.muscu, run_plan:prog.run };
     if(goalEl&&goalEl.value){ upd.main_goal=goalEl.value; }
