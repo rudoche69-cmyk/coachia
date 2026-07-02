@@ -90,9 +90,11 @@ const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 if ('serviceWorker' in navigator) { window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); }); }
 try{ var __th=localStorage.getItem('coachia-theme'); if(__th) document.documentElement.setAttribute('data-theme',__th); }catch(e){}
 
-const S = { screen:'login', user:null, profile:null, todayCheckin:null, todayScore:null, weights:[], lifts:[], chargeExo:null, history:[], athletes:[], selAthlete:null, selAthleteProfile:null, coachBusy:false, selWeights:[], nutrition:null, meals:[], genNut:false, foodLog:[], runs:[], checkinCount:0, comps:[], chat:[], aiThinking:false, report:null, reportLoading:false, runPlan:null, selRun:null, muscu:null, selMuscuDay:null, leaderboard:null, tests:[], calY:null, calM:null, calSel:null, workout:null, exercises:[], started:false, generating:false, msg:null };
+const S = { screen:'login', user:null, profile:null, todayCheckin:null, todayScore:null, weights:[], lifts:[], chargeExo:null, history:[], athletes:[], selAthlete:null, selAthleteProfile:null, coachBusy:false, selWeights:[], nutrition:null, meals:[], genNut:false, foodLog:[], foodMode:'simple', runs:[], checkinCount:0, comps:[], chat:[], aiThinking:false, report:null, reportLoading:false, runPlan:null, selRun:null, muscu:null, selMuscuDay:null, leaderboard:null, tests:[], calY:null, calM:null, calSel:null, workout:null, exercises:[], started:false, generating:false, msg:null };
 function ymd(d){ return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2); }
 const today = () => ymd(new Date());
+/* Base d'aliments (valeurs pour 100 g) : [nom, kcal, protéines, glucides, lipides] */
+const FOODS=[['Poulet (blanc)',165,31,0,3.6],['Dinde (escalope)',135,29,0,1],['Bœuf haché 5%',137,21,0,5],['Steak haché 15%',220,20,0,15],['Jambon blanc',107,18,1,3.5],['Saumon',208,20,0,13],['Thon (nature)',116,26,0,1],['Œuf entier',143,13,1.1,10],['Blanc d\'œuf',52,11,0.7,0.2],['Riz cuit',130,2.7,28,0.3],['Riz basmati cuit',121,3,25,0.4],['Pâtes cuites',131,5,25,1.1],['Pomme de terre',87,2,20,0.1],['Patate douce',86,1.6,20,0.1],['Quinoa cuit',120,4.4,21,1.9],['Flocons d\'avoine',389,17,66,7],['Pain complet',247,13,41,3.4],['Pain de mie',265,9,49,3.3],['Lentilles cuites',116,9,20,0.4],['Haricots rouges',127,9,22,0.5],['Pois chiches',164,9,27,2.6],['Yaourt nature',61,3.5,4.7,3.3],['Yaourt grec',59,10,3.6,0.4],['Fromage blanc 0%',47,8,4,0.2],['Skyr',63,11,4,0.2],['Lait demi-écrémé',46,3.3,5,1.6],['Comté',410,27,0,34],['Mozzarella',280,22,2.2,17],['Fromage râpé',380,25,1,30],['Amandes',579,21,22,50],['Beurre de cacahuète',588,25,20,50],['Banane',89,1.1,23,0.3],['Pomme',52,0.3,14,0.2],['Orange',47,0.9,12,0.1],['Fraises',32,0.7,7.7,0.3],['Avocat',160,2,9,15],['Brocoli',34,2.8,7,0.4],['Épinards',23,2.9,3.6,0.4],['Carotte',41,0.9,10,0.2],['Tomate',18,0.9,3.9,0.2],['Huile d\'olive',884,0,0,100],['Beurre',717,0.9,0.1,81],['Miel',304,0.3,82,0],['Sucre',400,0,100,0],['Chocolat noir',546,5,61,31],['Whey (poudre)',400,80,8,7]];
 
 function computeScore(c){
   let s = (c.sleep + (10-c.fatigue) + (10-c.stress) + c.motivation)/4;
@@ -505,7 +507,16 @@ function scrNutrition(){
     trackBar('Protéines (g)',tot.protein,n.protein,'var(--accent)')+
     trackBar('Glucides (g)',tot.carbs,n.carbs,'var(--green)')+
     trackBar('Lipides (g)',tot.fat,n.fat,'var(--amber)')+'</div>';
-  var addForm='<div class="card"><div class="flabel">Ajouter un aliment / repas</div><input id="fd-name" class="in" type="text" placeholder="Nom (ex : Poulet + riz)"><div class="row" style="gap:6px;margin-top:7px"><input id="fd-cal" class="in" type="number" placeholder="kcal" style="margin-top:0"><input id="fd-p" class="in" type="number" placeholder="P" style="margin-top:0"><input id="fd-c" class="in" type="number" placeholder="G" style="margin-top:0"><input id="fd-f" class="in" type="number" placeholder="L" style="margin-top:0"></div><button class="btn" onclick="doAddFood()" style="margin-top:10px">Ajouter au suivi</button></div>';
+  var mode=S.foodMode||'simple';
+  var seg='<div class="seg"><button class="'+(mode==='simple'?'on':'')+'" onclick="setFoodMode(\'simple\')">Aliment</button><button class="'+(mode==='compose'?'on':'')+'" onclick="setFoodMode(\'compose\')">Menu composé (IA)</button></div>';
+  var body;
+  if(mode==='compose'){
+    body='<textarea id="fd-compose" class="in" style="min-height:70px;resize:vertical" placeholder="Ex : 150 g de poulet, 100 g de riz, 1 yaourt grec"></textarea><button class="btn" onclick="doAIMacros()" style="margin-top:9px"><i class="ti ti-sparkles"></i> Estimer les macros et ajouter</button>';
+  } else {
+    var fopts='<option value="">— choisir un aliment —</option>'+FOODS.map(function(f,i){return '<option value="'+i+'">'+esc(f[0])+'</option>';}).join('');
+    body='<select class="in" id="fd-food">'+fopts+'</select><input id="fd-qty" class="in" type="number" placeholder="Quantité (g)"><div class="sub" style="font-size:11px;margin:8px 2px">Ou, si l\'aliment n\'est pas dans la liste, saisie manuelle :</div><input id="fd-name" class="in" type="text" placeholder="Nom (manuel)"><div class="row" style="gap:6px;margin-top:7px"><input id="fd-cal" class="in" type="number" placeholder="kcal" style="margin-top:0"><input id="fd-p" class="in" type="number" placeholder="P" style="margin-top:0"><input id="fd-c" class="in" type="number" placeholder="G" style="margin-top:0"><input id="fd-f" class="in" type="number" placeholder="L" style="margin-top:0"></div><button class="btn" onclick="doAddFood2()" style="margin-top:10px">Ajouter au suivi</button>';
+  }
+  var addForm='<div class="card"><div class="flabel" style="margin-bottom:7px">Ajouter au suivi</div>'+seg+body+'</div>';
   var entries=S.foodLog||[];
   var elist=entries.length?('<div class="label" style="margin:6px 2px 8px">Mes aliments du jour</div><div class="card" style="padding:6px 14px">'+entries.map(function(f){ return '<div class="ex"><div class="m"><div class="nm">'+esc(f.name||'Aliment')+'</div><div class="ds">'+(f.calories||0)+' kcal · P '+(f.protein||0)+' · G '+(f.carbs||0)+' · L '+(f.fat||0)+'</div></div><span onclick="doDelFood(\''+f.id+'\')" style="cursor:pointer;color:var(--red);font-weight:700;font-size:20px;padding:0 4px">×</span></div>'; }).join('')+'</div>'):'';
   return tb+msg+tracker+addForm+elist+'<div class="label" style="margin:10px 2px 8px">Mon plan conseillé</div>'+head+hyd+'<div class="card" style="padding:6px 14px">'+list+'</div><button class="btn outline" onclick="doGenNutrition()"><i class="ti ti-refresh"></i> Régénérer ma nutrition</button>';
@@ -528,6 +539,37 @@ async function doAddMealToLog(mi){
   render();
 }
 async function doDelFood(id){ try{ await db.from('food_entries').delete().eq('id',id); await loadFood(); }catch(e){} render(); }
+function setFoodMode(m){ S.foodMode=m; render(); }
+async function addFoodRow(name,cal,p,c,f){
+  try{ await db.from('food_entries').insert({athlete_id:S.user.id,date:today(),name:name,calories:cal,protein:p,carbs:c,fat:f}); await loadFood(); S.msg={k:'ok',t:'Ajouté au suivi.'}; }
+  catch(e){ S.msg={k:'err',t:'Erreur : '+(e.message||e)+' (la table food_entries est-elle créée ?)'}; }
+  render();
+}
+async function doAddFood2(){
+  var fEl=document.getElementById('fd-food'); var idx=fEl?fEl.value:'';
+  if(idx!=='' && idx!=null){
+    var q=parseFloat((document.getElementById('fd-qty')||{}).value)||0;
+    if(!q){ S.msg={k:'err',t:'Indique la quantité en grammes.'}; render(); return; }
+    var f=FOODS[parseInt(idx)]; var k=q/100;
+    await addFoodRow(f[0]+' — '+q+' g', Math.round(f[1]*k), Math.round(f[2]*k), Math.round(f[3]*k), Math.round(f[4]*k));
+    return;
+  }
+  var g=function(id){var e=document.getElementById(id);return e?e.value.trim():'';};
+  var name=g('fd-name'); var cal=parseInt(g('fd-cal'))||0; var p=parseInt(g('fd-p'))||0; var c=parseInt(g('fd-c'))||0; var ft=parseInt(g('fd-f'))||0;
+  if(!name && !cal){ S.msg={k:'err',t:'Choisis un aliment dans la liste, ou remplis la saisie manuelle.'}; render(); return; }
+  await addFoodRow(name||'Aliment', cal, p, c, ft);
+}
+async function doAIMacros(){
+  var el=document.getElementById('fd-compose'); var txt=(el?el.value:'').trim();
+  if(!txt){ S.msg={k:'err',t:'Décris ton repas (ex : 150 g poulet + 100 g riz).'}; render(); return; }
+  S.msg={k:'ok',t:'Estimation en cours…'}; render();
+  try{
+    var r=await invokeFn('ai-coach',{mode:'macros',question:txt});
+    var mac=(r.data&&r.data.macros)||null;
+    if(!mac){ var errd=(r.data&&r.data.error)||(r.error&&r.error.message)||'estimation impossible'; S.msg={k:'err',t:'IA : '+errd}; render(); return; }
+    await addFoodRow(txt.slice(0,80), Math.round(mac.calories||0), Math.round(mac.protein||0), Math.round(mac.carbs||0), Math.round(mac.fat||0));
+  }catch(e){ S.msg={k:'err',t:'Erreur : '+(e.message||e)}; render(); }
+}
 async function doGenNutrition(){
   S.genNut=true; S.screen='nutrition'; render();
   try{
