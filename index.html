@@ -91,7 +91,8 @@ if ('serviceWorker' in navigator) { window.addEventListener('load', () => { navi
 try{ var __th=localStorage.getItem('coachia-theme'); if(__th) document.documentElement.setAttribute('data-theme',__th); }catch(e){}
 
 const S = { screen:'login', user:null, profile:null, todayCheckin:null, todayScore:null, weights:[], lifts:[], chargeExo:null, history:[], athletes:[], selAthlete:null, selAthleteProfile:null, coachBusy:false, selWeights:[], nutrition:null, meals:[], genNut:false, foodLog:[], runs:[], checkinCount:0, comps:[], chat:[], aiThinking:false, report:null, reportLoading:false, runPlan:null, selRun:null, muscu:null, selMuscuDay:null, leaderboard:null, calY:null, calM:null, calSel:null, workout:null, exercises:[], started:false, generating:false, msg:null };
-const today = () => new Date().toISOString().slice(0,10);
+function ymd(d){ return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2); }
+const today = () => ymd(new Date());
 
 function computeScore(c){
   let s = (c.sleep + (10-c.fatigue) + (10-c.stress) + c.motivation)/4;
@@ -194,7 +195,7 @@ function scrDash(){
     goalHint+compBanner()+(p.role==='admin'?'<div class="card" onclick="go(\'coach\')" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between"><div style="display:flex;align-items:center;gap:10px"><i class="ti ti-users" style="color:var(--accent);font-size:20px"></i><span style="font-weight:700">Espace coach</span></div><i class="ti ti-chevron-right" style="color:var(--faint)"></i></div>':'')+scoreCard+
     (hasScore?'<button class="btn outline" onclick="go(\'checkin\')" style="margin-bottom:13px"><i class="ti ti-refresh"></i> Modifier mon check-in du jour</button>':'')+
     seance+
-    '<div class="card"><div class="row" style="margin-bottom:10px"><div class="label">Poids actuel</div><span class="sub" style="font-weight:700;color:var(--ink)">'+lastW+'</span></div>'+weightSVG(w)+'</div>'+'<div class="label" style="margin:14px 2px 8px">Mes outils</div><div class="tiles">'+tile('ti-barbell','Programme muscu','muscu')+tile('ti-run','Sorties course','runs')+tile('ti-salad','Nutrition','nutrition')+tile('ti-calendar-event','Agenda','calendar')+tile('ti-chart-line','Charges','charges')+tile('ti-robot','Assistant IA','assistant')+tile('ti-file-text','Rapport','report')+tile('ti-trophy','Compétitions','comps')+tile('ti-medal','Mes badges','badges')+tile('ti-crown','Classement','leaderboard')+tile('ti-message-circle','Avis','feedback')+'</div>';
+    '<div class="card"><div class="row" style="margin-bottom:10px"><div class="label">Poids actuel</div><span class="sub" style="font-weight:700;color:var(--ink)">'+lastW+'</span></div>'+weightSVG(w)+'</div>'+'<div class="card" onclick="go(\'programopts\')" style="cursor:pointer;background:var(--accent);border:none"><div style="font-weight:700;font-size:15px;color:#fff"><i class="ti ti-wand"></i> Créer mon programme complet</div><div style="font-size:12px;color:#fff;opacity:.9;margin-top:3px">Muscu + course + objectif, sur un seul planning</div></div>'+'<div class="label" style="margin:14px 2px 8px">Mes outils</div><div class="tiles">'+tile('ti-barbell','Programme muscu','muscu')+tile('ti-run','Sorties course','runs')+tile('ti-salad','Nutrition','nutrition')+tile('ti-calendar-event','Agenda','calendar')+tile('ti-chart-line','Charges','charges')+tile('ti-robot','Assistant IA','assistant')+tile('ti-file-text','Rapport','report')+tile('ti-trophy','Compétitions','comps')+tile('ti-medal','Mes badges','badges')+tile('ti-crown','Classement','leaderboard')+tile('ti-message-circle','Avis','feedback')+'</div>';
 }
 function scrWorkout(){
   if(S.generating){ return '<div class="tbar"><button class="ic" onclick="go(\'dash\')"><i class="ti ti-chevron-left"></i></button><h2 style="font-size:19px">Séance du jour</h2><span style="width:38px"></span></div><div class="center" style="min-height:380px"><div class="spin" style="border-color:var(--accent);border-top-color:transparent;width:30px;height:30px"></div><div>L\'IA génère ta séance…</div><div class="sub">Quelques secondes</div></div>'; }
@@ -712,7 +713,6 @@ async function doReport(){
   catch(e){ S.report='Erreur : '+(e.message||e); }
   S.reportLoading=false; render();
 }
-/* ===== PLAN COURSE (progressif, guidé pas à pas) ===== */
 function runTypeLabel(t){ return ({EF:'Endurance fondamentale',FRAC:'Fractionné',LONG:'Sortie longue',RECUP:'Récupération',MC:'Marche / course'})[t]||'Sortie'; }
 function runTypeBg(t){ return t==='FRAC'?'var(--amber-bg)':(t==='LONG'?'var(--green-bg)':(t==='RECUP'?'var(--green-bg)':'var(--accent-soft)')); }
 function runTypeCol(t){ return t==='FRAC'?'var(--amber)':(t==='LONG'?'var(--green)':(t==='RECUP'?'var(--green)':'var(--accent)')); }
@@ -773,8 +773,8 @@ function runWeekPlan(k){
   return [];
 }
 function runDayOffsets(n){ return n<=2?[0,3]:(n===3?[0,2,4]:(n>=4?[0,1,3,5]:[0,2,4])); }
-function addDays(dstr,n){ var d=new Date(dstr+'T00:00:00'); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); }
-function nextMonday(dstr){ var d=new Date(dstr+'T00:00:00'); var wd=(d.getDay()+6)%7; if(wd!==0){ d.setDate(d.getDate()+(7-wd)); } return d.toISOString().slice(0,10); }
+function addDays(dstr,n){ var d=new Date(dstr+'T00:00:00'); d.setDate(d.getDate()+n); return ymd(d); }
+function nextMonday(dstr){ var d=new Date(dstr+'T00:00:00'); var wd=(d.getDay()+6)%7; if(wd!==0){ d.setDate(d.getDate()+(7-wd)); } return ymd(d); }
 function buildRunPlan(goalKey,perWeek,start){
   start=nextMonday(start);
   var tmpl=runWeekPlan(goalKey); var weeks=[];
@@ -858,7 +858,6 @@ function runUpcomingCard(){
   var rows=up.map(function(it){var d=new Date(it.date+'T00:00:00');var ds=isNaN(d)?it.date:d.toLocaleDateString('fr-FR',{weekday:'short',day:'numeric',month:'short'});var ck=it.done?'<i class="ti ti-circle-check" style="color:var(--green);font-size:18px"></i>':'<i class="ti ti-chevron-right" style="color:var(--faint);font-size:16px"></i>';return '<div class="ex" onclick="openRunSession('+it.wi+','+it.si+')" style="cursor:pointer"><div class="n" style="background:'+runTypeBg(it.t)+';color:'+runTypeCol(it.t)+'"><i class="ti ti-run"></i></div><div class="m"><div class="nm">'+ds+' · '+runTypeLabel(it.t)+'</div><div class="ds">'+esc(it.m)+'</div></div>'+ck+'</div>';}).join('');
   return '<div class="label" style="margin:4px 2px 8px">Plan course — à venir</div><div class="card" style="padding:6px 14px">'+rows+'</div>';
 }
-/* ===== PROGRAMME MUSCU multi-semaines (adaptatif, éditable) ===== */
 function muscuEquipTier(eq){ eq=(eq||'').toLowerCase();
   if(eq.indexOf('complète')>=0||eq.indexOf('basique')>=0||eq.indexOf('salle')>=0) return 'full';
   if(eq.indexOf('maison')>=0||eq.indexOf('haltère')>=0||eq.indexOf('barre')>=0) return 'home';
@@ -1016,6 +1015,85 @@ async function doToggleMuscuDone(){
   try{ await db.from('profiles').update({muscu_program:S.muscu}).eq('id',S.user.id); if(S.profile)S.profile.muscu_program=S.muscu; }catch(e){}
   render();
 }
+function weekSlots(n){ return [[0],[0,3],[0,2,4],[0,2,4,6],[0,1,3,4,6],[0,1,2,4,5,6]][Math.min(Math.max(n,1),6)-1]; }
+function objectiveSplit(goal,N){
+  var g=(goal||'').toLowerCase();
+  var isCourse=['run','cours','10 km','10km','marathon','semi','trail','5 km','vite','hyrox'].some(function(w){return g.indexOf(w)>=0;});
+  var isMuscu=['muscu','force','hypertroph','masse','explos'].some(function(w){return g.indexOf(w)>=0;});
+  var course;
+  if(isCourse&&!isMuscu) course=Math.max(1,Math.round(N*0.6));
+  else if(isMuscu&&!isCourse) course=Math.max(0,Math.floor(N*0.25));
+  else course=Math.round(N*0.5);
+  course=Math.min(Math.max(course,0),N);
+  return {course:course, muscu:N-course};
+}
+function unifiedCourseTypes(c){ return [[],['EF'],['EF','FRAC'],['EF','FRAC','LONG'],['EF','FRAC','EF','LONG'],['EF','FRAC','EF','LONG','EF']][Math.min(Math.max(c,0),5)]; }
+function unifiedCourseMain(t,w){
+  if(t==='EF') return (25+Math.min(w*2,20))+' min de footing lent (endurance fondamentale : tu dois pouvoir parler).';
+  if(t==='FRAC') return '10 min footing, puis '+(6+Math.min(w,6))+' × (1 min vite / 1 min 30 lent), puis 8 min footing.';
+  if(t==='LONG') return (40+Math.min(w*3,30))+' min en allure tranquille (sortie longue).';
+  return '30 min de footing.';
+}
+function buildUnifiedProgram(goal,N,weeks,equip,start){
+  start=nextMonday(start);
+  var split=objectiveSplit(goal,N);
+  var slots=weekSlots(N);
+  var types=[]; var m=split.muscu, c=split.course;
+  for(var i=0;i<N;i++){ if(i%2===0){ if(c>0){types.push('course');c--;} else {types.push('muscu');m--;} } else { if(m>0){types.push('muscu');m--;} else {types.push('course');c--;} } }
+  var muscuOffs=[], courseOffs=[];
+  for(var k=0;k<N;k++){ if(types[k]==='muscu') muscuOffs.push(slots[k]); else courseOffs.push(slots[k]); }
+  var tier=muscuEquipTier(equip);
+  var mSplit=split.muscu<=1?'fullbody':(split.muscu===2?'upperlower':'ppl');
+  var pattern=muscuSplitDays(mSplit);
+  var cTypes=unifiedCourseTypes(split.course);
+  var mdays=[]; var counter=0; var runWeeks=[];
+  for(var w=1;w<=weeks;w++){
+    for(var s=0;s<muscuOffs.length;s++){
+      var grp=pattern[counter % pattern.length]; counter++;
+      var lib=muscuExo(grp,tier);
+      var deload=(w===weeks && weeks>=4);
+      var exs=lib.map(function(e){ var base=muscuLastLoad(e[0]); var load=base?((deload?Math.round(base*0.9):base)+' kg'):''; var sets=deload?Math.max(2,e[1]-1):e[1]; return {name:e[0],sets:sets,reps:e[2],load:load,rest:'2 min',done:false}; });
+      mdays.push({id:'w'+w+'m'+(s+1), week:w, label:muscuDayLabel(grp), date:addDays(start,(w-1)*7+muscuOffs[s]), deload:deload, done:false, exercises:exs});
+    }
+    var sess=[];
+    for(var q=0;q<courseOffs.length;q++){ var ct=cTypes[q%cTypes.length]||'EF'; sess.push({id:'w'+w+'c'+(q+1), t:ct, m:unifiedCourseMain(ct,w), date:addDays(start,(w-1)*7+courseOffs[q]), done:false}); }
+    runWeeks.push({n:w, f:'Semaine '+w, sessions:sess});
+  }
+  var muscu = split.muscu>0 ? {split:mSplit, perWeek:split.muscu, weeks:weeks, equip:equip, start:start, days:mdays, unified:true} : null;
+  var run = split.course>0 ? {goal:'unifie', perWeek:split.course, start:start, weeks:runWeeks, unified:true} : null;
+  return {muscu:muscu, run:run, split:split};
+}
+function scrProgramOpts(){
+  var p=S.profile||{};
+  var tb='<div class="tbar"><button class="ic" onclick="go(\'dash\')"><i class="ti ti-chevron-left"></i></button><h2 style="font-size:19px">Programme complet</h2><span style="width:38px"></span></div>';
+  var goals=['Hyrox Solo','Hyrox Double','Football','Running','Courir plus vite','Trail','Marathon','Semi-marathon','Spartan Race','Cross Training','Musculation','Force','Hypertrophie','Explosivité','Perte de poids','Recomposition corporelle','Prise de masse','Prise de masse musculaire','Santé'].map(function(x){return [x,x];});
+  var eq=[['Salle de sport complète','Salle de sport complète'],['Salle de sport (basique)','Salle de sport (basique)'],['Matériel maison (haltères/barre)','Matériel maison (haltères/barre)'],['Petit matériel (élastiques, kettlebell)','Petit matériel (élastiques, kettlebell)'],['Sans matériel (poids du corps)','Sans matériel (poids du corps)']];
+  var wopt=''; for(var i=2;i<=6;i++){ wopt+='<option value="'+i+'"'+(i===4?' selected':'')+'>'+i+' séances / semaine</option>'; }
+  return tb+'<div class="banner" style="background:var(--accent-soft)"><i class="ti ti-wand" style="color:var(--accent)"></i><div class="x" style="color:#1742a5">Un seul programme qui combine <b>muscu + course</b> selon ton objectif et le nombre de séances dispo. L\'app répartit tout sur ton planning. Tu pourras toujours générer une <b>séance bonus</b> (onglet Séance) un jour libre.</div></div>'+
+    selField('up-goal','Mon objectif',p.main_goal,goals)+
+    '<div class="card"><div class="flabel">Combien de séances par semaine au total ?</div><select class="in" id="up-week">'+wopt+'</select></div>'+
+    '<div class="card"><div class="flabel">Durée du programme</div><select class="in" id="up-weeks"><option value="4">4 semaines</option><option value="6" selected>6 semaines</option><option value="8">8 semaines</option></select></div>'+
+    selField('up-equip','Matériel disponible',p.available_equipment,eq)+
+    '<div class="card"><div class="flabel">Date de début (démarre le lundi suivant)</div><input id="up-start" class="in" type="date" value="'+today()+'"></div>'+
+    '<button class="btn" onclick="doCreateUnified()"><i class="ti ti-sparkles"></i> Créer mon programme complet</button>';
+}
+async function doCreateUnified(){
+  var goalEl=document.getElementById('up-goal'); var goal=(goalEl&&goalEl.value)||(S.profile&&S.profile.main_goal)||'Forme';
+  var N=parseInt(document.getElementById('up-week').value)||4;
+  var weeks=parseInt(document.getElementById('up-weeks').value)||6;
+  var eqEl=document.getElementById('up-equip'); var equip=(eqEl&&eqEl.value)||(S.profile&&S.profile.available_equipment)||'Salle de sport (basique)';
+  var start=document.getElementById('up-start').value||today();
+  var prog=buildUnifiedProgram(goal,N,weeks,equip,start);
+  try{
+    var upd={ muscu_program:prog.muscu, run_plan:prog.run };
+    if(goalEl&&goalEl.value){ upd.main_goal=goalEl.value; }
+    var r=await db.from('profiles').update(upd).eq('id',S.user.id);
+    if(r.error) throw r.error;
+    S.muscu=prog.muscu; S.runPlan=prog.run; if(S.profile){ S.profile.muscu_program=prog.muscu; S.profile.run_plan=prog.run; if(upd.main_goal)S.profile.main_goal=upd.main_goal; }
+    S.msg={k:'ok',t:'Programme complet créé ✅ '+prog.split.muscu+' muscu + '+prog.split.course+' course / semaine. Vois-le dans l\'Agenda.'};
+  }catch(e){ S.msg={k:'err',t:'Erreur : '+(e.message||e)}; }
+  S.screen='dash'; render();
+}
 function navBar(){
   const b=(ic,t)=>'<button class="'+(S.screen===t?'on':'')+'" onclick="go(\''+t+'\')" style="font-size:11px;font-weight:700;color:inherit;letter-spacing:.02em">'+ic+'</button>';
   return b('Accueil','dash')+b('Séance','workout')+b('Nutrition','nutrition')+b('Check-in','checkin')+b('Agenda','calendar');
@@ -1026,7 +1104,7 @@ function render(extra){
   if(S.screen==='login'){ html=scrLogin(); nav.style.display='none'; }
   else if(S.screen==='result'){ html=scrResult(extra); nav.style.display='flex'; nav.innerHTML=navBar(); }
   else { nav.style.display='flex'; nav.innerHTML=navBar();
-    html = S.screen==='checkin'?scrCheckin():(S.screen==='workout'?scrWorkout():(S.screen==='profile'?scrProfile():(S.screen==='genopts'?scrGenOptions():(S.screen==='charges'?scrCharges():(S.screen==='calendar'?scrCalendar():(S.screen==='coach'?scrCoach():(S.screen==='coachDetail'?scrCoachDetail():(S.screen==='nutrition'?scrNutrition():(S.screen==='runs'?scrRuns():(S.screen==='badges'?scrBadges():(S.screen==='feedback'?scrFeedback():(S.screen==='comps'?scrComps():(S.screen==='assistant'?scrAssistant():(S.screen==='report'?scrReport():(S.screen==='runplanopts'?scrRunPlanOpts():(S.screen==='runsession'?scrRunSession():(S.screen==='newathlete'?scrNewAthlete():(S.screen==='athleteEdit'?scrAthleteEdit():(S.screen==='muscu'?scrMuscu():(S.screen==='muscuopts'?scrMuscuOpts():(S.screen==='muscuday'?scrMuscuDay():(S.screen==='leaderboard'?scrLeaderboard():(S.screen==='groupsession'?scrGroupSession():scrDash())))))))))))))))))))))));
+    html = S.screen==='checkin'?scrCheckin():(S.screen==='workout'?scrWorkout():(S.screen==='profile'?scrProfile():(S.screen==='genopts'?scrGenOptions():(S.screen==='charges'?scrCharges():(S.screen==='calendar'?scrCalendar():(S.screen==='coach'?scrCoach():(S.screen==='coachDetail'?scrCoachDetail():(S.screen==='nutrition'?scrNutrition():(S.screen==='runs'?scrRuns():(S.screen==='badges'?scrBadges():(S.screen==='feedback'?scrFeedback():(S.screen==='comps'?scrComps():(S.screen==='assistant'?scrAssistant():(S.screen==='report'?scrReport():(S.screen==='runplanopts'?scrRunPlanOpts():(S.screen==='runsession'?scrRunSession():(S.screen==='newathlete'?scrNewAthlete():(S.screen==='athleteEdit'?scrAthleteEdit():(S.screen==='muscu'?scrMuscu():(S.screen==='muscuopts'?scrMuscuOpts():(S.screen==='muscuday'?scrMuscuDay():(S.screen==='leaderboard'?scrLeaderboard():(S.screen==='groupsession'?scrGroupSession():(S.screen==='programopts'?scrProgramOpts():scrDash()))))))))))))))))))))))));
   }
   sc.innerHTML=html; sc.scrollTop=0; S.msg=null;
   const e=document.getElementById('i-email'); if(e) e.addEventListener('keydown',ev=>{if(ev.key==='Enter')document.getElementById('i-pass').focus();});
