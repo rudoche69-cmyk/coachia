@@ -422,7 +422,8 @@ function scrCoachDetail(){
   var busy=S.coachBusy?'<div class="banner" style="background:var(--accent-soft)"><div class="spin" style="border-color:var(--accent);border-top-color:transparent"></div><div class="x" style="color:#1742a5">Génération en cours… quelques secondes.</div></div>':'';
   var actions='<button class="btn" onclick="doGenForAthlete(\'workout\')"'+(S.coachBusy?' disabled':'')+'><i class="ti ti-sparkles"></i> Générer sa séance du jour</button>'+
     '<button class="btn ghost" style="margin-top:9px" onclick="doGenForAthlete(\'nutrition\')"'+(S.coachBusy?' disabled':'')+'><i class="ti ti-salad"></i> Générer sa nutrition</button>'+
-    '<button class="btn outline" style="margin-top:9px" onclick="go(\'athleteEdit\')"><i class="ti ti-edit"></i> Modifier son profil / objectif</button>';
+    '<button class="btn outline" style="margin-top:9px" onclick="go(\'athleteEdit\')"><i class="ti ti-edit"></i> Modifier son profil / objectif</button>'+
+    '<button class="btn outline" style="margin-top:9px;color:var(--red);border-color:var(--red)" onclick="doDeleteAthlete()"><i class="ti ti-trash"></i> Supprimer ce compte</button>';
   return tb+msg+head+info+wt+busy+actions;
 }
 async function doGenForAthlete(kind){
@@ -436,6 +437,20 @@ async function doGenForAthlete(kind){
     if(r.error||(r.data&&r.data.error)){ var d=(r.data&&r.data.error)||(r.error&&r.error.message)||'erreur'; S.msg={k:'err',t:'Génération impossible : '+d}; render(); return; }
     var who=(S.selAthlete.first_name)||'l\'athlète';
     S.msg={k:'ok',t:(kind==='nutrition'?'Nutrition générée pour ':'Séance générée pour ')+who+' ✅ (visible dans son espace)'}; render();
+  }catch(e){ S.coachBusy=false; S.msg={k:'err',t:'Erreur : '+(e.message||e)}; render(); }
+}
+async function doDeleteAthlete(){
+  if(!S.selAthlete) return;
+  var nm=((S.selAthlete.first_name||'')+' '+(S.selAthlete.last_name||'')).trim()||'cet athlète';
+  if(!confirm('Supprimer définitivement le compte de '+nm+' ? Cette action est irréversible.')) return;
+  var id=S.selAthlete.id;
+  S.coachBusy=true; render();
+  try{
+    var r=await invokeFn('admin-create-athlete',{action:'delete',athlete_id:id});
+    if(r.error){ r=await invokeFn('super-function',{action:'delete',athlete_id:id}); }
+    S.coachBusy=false;
+    if(r.error||(r.data&&r.data.error)){ var d=(r.data&&r.data.error)||(r.error&&r.error.message)||'erreur'; S.msg={k:'err',t:'Suppression impossible : '+d}; render(); return; }
+    await loadAll(); S.selAthlete=null; S.selAthleteProfile=null; S.msg={k:'ok',t:'Compte supprimé.'}; S.screen='coach'; render();
   }catch(e){ S.coachBusy=false; S.msg={k:'err',t:'Erreur : '+(e.message||e)}; render(); }
 }
 function scrNewAthlete(){
