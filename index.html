@@ -1438,8 +1438,8 @@ function autoMilestones(gd, cur){
 function goalPrompt(){ return '<div class="card" onclick="openMyGoals()" style="cursor:pointer;border:1px dashed var(--accent)"><div style="display:flex;align-items:center;gap:10px"><i class="ti ti-target" style="color:var(--accent);font-size:20px"></i><div style="flex:1"><div style="font-weight:700">Définir mes objectifs</div><div class="sub">Choisis ta discipline et, si tu veux, une cible chiffrée à suivre.</div></div><i class="ti ti-chevron-right" style="color:var(--faint)"></i></div></div>'; }
 function goalTargetBlock(t, self, showName){
   var pr=goalProgress(t, self); var pct=pr.pct; var cur=pr.cur; var unit=t.unit||'';
-  var name=t.type==='charge'?esc(t.label||'Charge'):goalTypeLabel(t.type);
-  var head=showName?'<div class="label" style="margin:10px 0 3px">'+name+'</div>':'';
+  var name=goalTargetName(t);
+  var head='<div class="label" style="margin:10px 0 3px">'+name+'</div>';
   var bar = pct!=null?'<div style="height:10px;background:var(--line);border-radius:20px;overflow:hidden;margin:6px 0"><div style="height:100%;width:'+pct+'%;background:var(--accent);border-radius:20px;transition:width .4s"></div></div>':'';
   var vals = pct!=null?'<div class="sub"><b style="color:var(--ink)">'+cur+' '+esc(unit)+'</b> → '+esc(t.target)+' '+esc(unit)+' · <b style="color:var(--accent)">'+pct+'%</b></div>':'<div class="sub">Cible '+esc(t.target)+' '+esc(unit)+(t.current!=null?' · actuel '+esc(t.current)+' '+esc(unit):'')+'</div>';
   var msg='<div class="sub" style="margin-top:5px;font-style:italic;color:var(--muted)">'+goalMsg(pct)+'</div>';
@@ -1481,16 +1481,24 @@ function scrGoals(){
 }
 function typeSelect(k,cur){ var opts=[['','— choisis —'],['poids','Mon poids'],['charge','Ma force sur un exercice'],['chrono','Mon temps de course'],['distance','Ma distance'],['reps','Mes répétitions'],['perso','Autre']]; var o=opts.map(function(x){return '<option value="'+x[0]+'"'+(cur===x[0]?' selected':'')+'>'+x[1]+'</option>';}).join(''); return '<div class="card"><div class="flabel">Que veux-tu suivre ?</div><select class="in" id="ge-type-'+k+'" onchange="onTypeChange('+k+')">'+o+'</select></div>'; }
 function autoNote(txt){ return '<div class="banner" style="background:var(--bg);margin-top:-4px"><i class="ti ti-bolt" style="color:var(--accent)"></i><div class="x" style="color:var(--muted)">'+txt+'</div></div>'; }
+function goalTargetName(t){
+  if(t.type==='charge') return esc(t.label||'Force');
+  if(t.type==='chrono') return 'Temps'+(t.label?' · '+esc(t.label):'');
+  if(t.type==='reps') return (t.label?esc(t.label):'Répétitions')+' (reps)';
+  if(t.type==='distance') return 'Distance'+(t.label?' · '+esc(t.label):'');
+  if(t.type==='perso') return esc(t.label||'Mesure');
+  return goalTypeLabel(t.type);
+}
 function goalSlotV2(k){
   var t=S.gEdit.targets[k]||{};
-  var head='<div class="row" style="margin:14px 2px 2px;align-items:center"><div class="label" style="color:var(--accent)">Ce que je suis n°'+(k+1)+'</div><span class="sub" style="color:var(--red);cursor:pointer" onclick="removeTarget('+k+')"><i class="ti ti-x" style="vertical-align:-2px"></i> Retirer</span></div>';
+  var head='<div class="row" style="margin:14px 2px 2px;align-items:center"><div class="label" style="color:var(--accent)">Cible chiffrée n°'+(k+1)+'</div><span class="sub" style="color:var(--red);cursor:pointer" onclick="removeTarget('+k+')"><i class="ti ti-x" style="vertical-align:-2px"></i> Retirer</span></div>';
   var sel=typeSelect(k,t.type||'');
   var f='';
   if(t.type==='poids'){ f=inField('ge-target-'+k,'Poids visé (kg)',t.target,'number','ex : 75')+autoNote('Ton poids actuel est pris automatiquement depuis tes check-ins — rien à saisir.'); }
-  else if(t.type==='charge'){ f=inField('ge-label-'+k,'Sur quel exercice ?',t.label,'text','ex : Squat')+inField('ge-target-'+k,'Charge visée (kg)',t.target,'number','ex : 100')+autoNote('Ta meilleure charge saisie sert de point de départ — automatique.'); }
-  else if(t.type==='chrono'){ f=inField('ge-current-'+k,'Ton temps actuel (min)',t.current,'number','ex : 60')+inField('ge-target-'+k,'Temps visé (min)',t.target,'number','ex : 50'); }
-  else if(t.type==='distance'){ f=inField('ge-current-'+k,'Distance actuelle',t.current,'number','ex : 5')+inField('ge-target-'+k,'Distance visée',t.target,'number','ex : 10')+inField('ge-unit-'+k,'Unité',t.unit||'km','text','km ou m'); }
-  else if(t.type==='reps'){ f=inField('ge-current-'+k,'Répétitions actuelles',t.current,'number','ex : 5')+inField('ge-target-'+k,'Objectif de répétitions',t.target,'number','ex : 20'); }
+  else if(t.type==='charge'){ f=inField('ge-label-'+k,'Sur quel exercice ?',t.label,'text','ex : Squat, Développé couché')+inField('ge-target-'+k,'Charge visée (kg)',t.target,'number','ex : 100')+autoNote('Ta meilleure charge saisie sert de point de départ — automatique.'); }
+  else if(t.type==='chrono'){ f=inField('ge-label-'+k,'Sur quelle distance / épreuve ?',t.label,'text','ex : 10 km, Semi, 5 km')+inField('ge-current-'+k,'Ton temps actuel (min)',t.current,'number','ex : 60')+inField('ge-target-'+k,'Temps visé (min)',t.target,'number','ex : 50'); }
+  else if(t.type==='distance'){ f=inField('ge-label-'+k,'Précision (facultatif)',t.label,'text','ex : sortie longue, cumul semaine')+inField('ge-current-'+k,'Distance actuelle',t.current,'number','ex : 5')+inField('ge-target-'+k,'Distance visée',t.target,'number','ex : 10')+inField('ge-unit-'+k,'Unité',t.unit||'km','text','km ou m'); }
+  else if(t.type==='reps'){ f=inField('ge-label-'+k,'Sur quel exercice ?',t.label,'text','ex : Tractions, Pompes')+inField('ge-current-'+k,'Répétitions actuelles',t.current,'number','ex : 5')+inField('ge-target-'+k,'Objectif de répétitions',t.target,'number','ex : 20'); }
   else if(t.type==='perso'){ f=inField('ge-label-'+k,'Nom de la mesure',t.label,'text','ex : tour de taille')+inField('ge-current-'+k,'Valeur actuelle',t.current,'number','')+inField('ge-target-'+k,'Valeur visée',t.target,'number','')+inField('ge-unit-'+k,'Unité',t.unit,'text','cm, kg…'); }
   return head+sel+f;
 }
@@ -1540,7 +1548,9 @@ async function doSaveGoalEdit(){
   var targets=[];
   var src=g.targets||[];
   for(var k=0;k<src.length;k++){ var t=src[k]; if(!t.type) continue;
-    var tv=num(t.target); if(tv==null||isNaN(tv)){ S.msg={k:'err',t:'« Ce que je suis n°'+(k+1)+' » : indique la valeur visée (ou retire cette ligne).'}; render(); return; }
+    var lblReq=(t.type==='charge'||t.type==='chrono'||t.type==='reps');
+    if(lblReq && !(t.label&&String(t.label).trim())){ S.msg={k:'err',t:'Cible n°'+(k+1)+' : précise '+(t.type==='chrono'?'la distance / épreuve (ex : 10 km)':'l\'exercice concerné')+'.'}; render(); return; }
+    var tv=num(t.target); if(tv==null||isNaN(tv)){ S.msg={k:'err',t:'Cible n°'+(k+1)+' : indique la valeur visée (ou retire cette ligne).'}; render(); return; }
     var start=num(t.start); if(start==null) start=baselineFor(t, self);
     var cur=num(t.current);
     if((t.type==='chrono'||t.type==='distance'||t.type==='reps'||t.type==='perso') && start==null) start=cur;
