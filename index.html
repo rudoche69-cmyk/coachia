@@ -1088,6 +1088,20 @@ function objectiveSplit(goal,N){
   course=Math.min(Math.max(course,0),N);
   return {course:course, muscu:N-course};
 }
+function goalCourseFrac(goal){
+  var g=(goal||'').toLowerCase();
+  var isCourse=['run','cours','10 km','10km','marathon','semi','trail','5 km','vite','hyrox'].some(function(w){return g.indexOf(w)>=0;});
+  var isMuscu=['muscu','force','hypertroph','masse','explos'].some(function(w){return g.indexOf(w)>=0;});
+  if(isCourse&&!isMuscu) return 0.6;
+  if(isMuscu&&!isCourse) return 0.25;
+  return 0.5;
+}
+function objectiveSplitBlend(primary,secondary,N){
+  var fp=goalCourseFrac(primary);
+  var frac=secondary?(2*fp+goalCourseFrac(secondary))/3:fp;
+  var course=Math.min(Math.max(Math.round(frac*N),0),N);
+  return {course:course, muscu:N-course};
+}
 function unifiedCourseTypes(c){ return [[],['EF'],['EF','FRAC'],['EF','FRAC','LONG'],['EF','FRAC','EF','LONG'],['EF','FRAC','EF','LONG','EF']][Math.min(Math.max(c,0),5)]; }
 function unifiedCourseMain(t,w){
   if(t==='EF') return (25+Math.min(w*2,20))+' min de footing lent (endurance fondamentale : tu dois pouvoir parler).';
@@ -1095,10 +1109,10 @@ function unifiedCourseMain(t,w){
   if(t==='LONG') return (40+Math.min(w*3,30))+' min en allure tranquille (sortie longue).';
   return '30 min de footing.';
 }
-function buildUnifiedProgram(goal,offsets,weeks,equip,start){
+function buildUnifiedProgram(goal,offsets,weeks,equip,start,secondary){
   start=nextMonday(start);
   var N=offsets.length;
-  var split=objectiveSplit(goal,N);
+  var split=objectiveSplitBlend(goal,secondary,N);
   var slots=offsets.slice().sort(function(a,b){return a-b;});
   var types=[]; var m=split.muscu, c=split.course;
   for(var i=0;i<N;i++){ if(i%2===0){ if(c>0){types.push('course');c--;} else {types.push('muscu');m--;} } else { if(m>0){types.push('muscu');m--;} else {types.push('course');c--;} } }
@@ -1133,7 +1147,8 @@ function scrProgramOpts(){
   var dayNames=['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
   var dayRow=dayNames.map(function(dn,idx){ var def=(idx===0||idx===2||idx===4)?' checked':''; return '<label style="flex:1;text-align:center;font-size:11px;font-weight:700;color:var(--muted)"><input type="checkbox" class="up-day" value="'+idx+'"'+def+' style="display:block;margin:0 auto 4px;width:18px;height:18px;accent-color:var(--accent)">'+dn+'</label>'; }).join('');
   return tb+'<div class="banner" style="background:var(--accent-soft)"><i class="ti ti-wand" style="color:var(--accent)"></i><div class="x" style="color:#1742a5">Un seul programme qui combine <b>muscu + course</b> selon ton objectif et les jours où tu t\'entraînes. L\'app répartit tout sur ton planning. Tu pourras toujours générer une <b>séance bonus</b> (onglet Séance) un jour libre.</div></div>'+
-    selField('up-goal','Mon objectif',p.main_goal,goals)+
+    selField('up-goal','Objectif principal',p.main_goal,goals)+
+    selField('up-goal2','Objectif secondaire (optionnel)',null,goals)+
     '<div class="card"><div class="flabel">Mes jours d\'entraînement (coche tes jours)</div><div class="row" style="gap:4px;margin-top:9px">'+dayRow+'</div></div>'+
     '<div class="card"><div class="flabel">Durée du programme</div><select class="in" id="up-weeks"><option value="4">4 semaines</option><option value="6" selected>6 semaines</option><option value="8">8 semaines</option></select></div>'+
     selField('up-equip','Matériel disponible',p.available_equipment,eq)+
@@ -1142,12 +1157,13 @@ function scrProgramOpts(){
 }
 async function doCreateUnified(){
   var goalEl=document.getElementById('up-goal'); var goal=(goalEl&&goalEl.value)||(S.profile&&S.profile.main_goal)||'Forme';
+  var g2El=document.getElementById('up-goal2'); var secondary=(g2El&&g2El.value)||'';
   var dayEls=document.querySelectorAll('.up-day'); var offs=[]; for(var i=0;i<dayEls.length;i++){ if(dayEls[i].checked) offs.push(parseInt(dayEls[i].value)); }
   if(!offs.length){ S.msg={k:'err',t:'Choisis au moins un jour d\'entraînement.'}; render(); return; }
   var weeks=parseInt(document.getElementById('up-weeks').value)||6;
   var eqEl=document.getElementById('up-equip'); var equip=(eqEl&&eqEl.value)||(S.profile&&S.profile.available_equipment)||'Salle de sport (basique)';
   var start=document.getElementById('up-start').value||today();
-  var prog=buildUnifiedProgram(goal,offs,weeks,equip,start);
+  var prog=buildUnifiedProgram(goal,offs,weeks,equip,start,secondary);
   try{
     var upd={ muscu_program:prog.muscu, run_plan:prog.run };
     if(goalEl&&goalEl.value){ upd.main_goal=goalEl.value; }
