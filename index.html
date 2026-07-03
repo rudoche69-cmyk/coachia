@@ -1377,14 +1377,37 @@ function scrTests(){
   var physCard='<div class="card"><div class="label" style="margin-bottom:10px">Test physique</div>'+simpleRow('Pompes (max)','pompes','t-pompes','reps',pp)+simpleRow('Tractions (max)','tractions','t-tractions','reps',tra)+simpleRow('Gainage (planche)','gainage','t-gainage','s',ga)+'</div>';
   return tb+msg+'<div class="banner" style="background:var(--accent-soft)"><i class="ti ti-clipboard-check" style="color:var(--accent)"></i><div class="x" style="color:#1742a5">Fais ces tests, note tes résultats, et refais-les toutes les 4-6 semaines pour mesurer tes progrès et affiner tes allures / charges.</div></div>'+pftCard+vmaCard+forceCard+physCard;
 }
+var ONB_STEPS=[
+  {ic:'ti-hand-love-you',ti:'Bienvenue sur CoachIA 👋',tx:'Ton coach t\'a créé un espace personnel. En 4 étapes rapides, voici comment t\'en servir.'},
+  {ic:'ti-clipboard-heart',ti:'1. Ton check-in du jour',tx:'Chaque matin, indique ton sommeil, ta fatigue, ton stress. CoachIA calcule ta forme et adapte ta séance en conséquence.'},
+  {ic:'ti-barbell',ti:'2. Ta séance',tx:'Dans l\'onglet Séance, génère ta séance du jour : elle s\'adapte à ton matériel, à ton objectif et à ta forme.'},
+  {ic:'ti-help-circle',ti:'3. Un exo que tu ne connais pas ?',tx:'Touche « ⓘ Technique / remplacer » sous un exercice : tu as une explication pas-à-pas, une vidéo, et tu peux le remplacer si la machine est prise.'},
+  {ic:'ti-target',ti:'4. Ton objectif',tx:'Dans Mon profil, renseigne ton objectif (perte de poids, Hyrox, force…) pour des séances vraiment sur-mesure.'}
+];
+function scrOnboarding(){
+  var i=Math.max(0,Math.min(S.onb||0,ONB_STEPS.length-1)); var s=ONB_STEPS[i]; var last=(i===ONB_STEPS.length-1);
+  var dots=ONB_STEPS.map(function(_,j){ return '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;margin:0 3px;background:'+(j===i?'var(--accent)':'var(--line)')+'"></span>'; }).join('');
+  return '<div class="login" style="min-height:78vh;display:flex;flex-direction:column;justify-content:center">'+
+    '<div style="text-align:right;margin-bottom:8px">'+(last?'':'<span class="sub" style="cursor:pointer;text-decoration:underline" onclick="onbSkip()">Passer</span>')+'</div>'+
+    '<div class="card" style="text-align:center;padding:30px 20px"><div style="width:66px;height:66px;border-radius:50%;background:var(--accent-soft);display:flex;align-items:center;justify-content:center;margin:0 auto 16px"><i class="ti '+s.ic+'" style="font-size:30px;color:var(--accent)"></i></div>'+
+    '<div style="font-size:19px;font-weight:800;margin-bottom:10px">'+esc(s.ti)+'</div>'+
+    '<div class="sub" style="font-size:14px;line-height:1.6;color:var(--ink)">'+esc(s.tx)+'</div></div>'+
+    '<div style="text-align:center;margin:16px 0">'+dots+'</div>'+
+    '<button class="btn" onclick="onbNext()">'+(last?'C\'est parti !':'Suivant')+'</button>';
+}
+function onbNext(){ S.onb=(S.onb||0)+1; if(S.onb>=ONB_STEPS.length){ onbSkip(); return; } render(); }
+function onbSkip(){ try{ localStorage.setItem('coachia_onb','1'); }catch(_){} S.onb=0; S.screen='dash'; render(); }
+function needsOnboarding(){ try{ return !!(S.profile && S.profile.role!=='admin' && !localStorage.getItem('coachia_onb')); }catch(_){ return false; } }
 function navBar(){
   const b=(ic,t)=>'<button class="'+(S.screen===t?'on':'')+'" onclick="go(\''+t+'\')" style="font-size:11px;font-weight:700;color:inherit;letter-spacing:.02em">'+ic+'</button>';
-  return b('Accueil','dash')+b('Séance','workout')+b('Nutrition','nutrition')+b('Check-in','checkin')+b('Agenda','calendar');
+  var ckDot=(S.user && !S.todayCheckin)?'<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--red);margin-left:4px;vertical-align:middle"></span>':'';
+  return b('Accueil','dash')+b('Séance','workout')+b('Nutrition','nutrition')+b('Check-in'+ckDot,'checkin')+b('Agenda','calendar');
 }
 function render(extra){
   const sc=document.getElementById('screen'), nav=document.getElementById('nav');
   let html='';
   if(S.screen==='login'){ html=scrLogin(); nav.style.display='none'; }
+  else if(S.screen==='onboarding'){ html=scrOnboarding(); nav.style.display='none'; }
   else if(S.screen==='result'){ html=scrResult(extra); nav.style.display='flex'; nav.innerHTML=navBar(); }
   else { nav.style.display='flex'; nav.innerHTML=navBar();
     html = S.screen==='checkin'?scrCheckin():(S.screen==='workout'?scrWorkout():(S.screen==='profile'?scrProfile():(S.screen==='genopts'?scrGenOptions():(S.screen==='charges'?scrCharges():(S.screen==='calendar'?scrCalendar():(S.screen==='coach'?scrCoach():(S.screen==='coachDetail'?scrCoachDetail():(S.screen==='nutrition'?scrNutrition():(S.screen==='runs'?scrRuns():(S.screen==='badges'?scrBadges():(S.screen==='feedback'?scrFeedback():(S.screen==='comps'?scrComps():(S.screen==='assistant'?scrAssistant():(S.screen==='report'?scrReport():(S.screen==='runplanopts'?scrRunPlanOpts():(S.screen==='runsession'?scrRunSession():(S.screen==='newathlete'?scrNewAthlete():(S.screen==='athleteEdit'?scrAthleteEdit():(S.screen==='muscu'?scrMuscu():(S.screen==='muscuopts'?scrMuscuOpts():(S.screen==='muscuday'?scrMuscuDay():(S.screen==='exodetail'?scrExoDetail():(S.screen==='leaderboard'?scrLeaderboard():(S.screen==='groupsession'?scrGroupSession():(S.screen==='programopts'?scrProgramOpts():(S.screen==='tests'?scrTests():scrDash()))))))))))))))))))))))))));
@@ -1403,7 +1426,7 @@ async function doLogin(){
   const btn=document.getElementById('b-login'); btn.disabled=true; btn.innerHTML='<span class="spin"></span>';
   const { data, error } = await db.auth.signInWithPassword({ email, password:pass });
   if(error){ S.msg={k:'err',t:'Connexion impossible : '+error.message}; render(); return; }
-  S.user = data.user; await loadAll(); S.screen='dash'; render();
+  S.user = data.user; await loadAll(); S.onb=0; S.screen=needsOnboarding()?'onboarding':'dash'; render();
 }
 async function doLogout(){ await db.auth.signOut(); S.user=null; S.profile=null; S.workout=null; S.screen='login'; render(); }
 function setPain(v){ painState=v; document.getElementById('py').classList.toggle('on',v); document.getElementById('pn').classList.toggle('on',!v); }
@@ -1437,7 +1460,7 @@ async function doGenerate(){
 
 (async function init(){
   const { data } = await db.auth.getSession();
-  if(data.session){ S.user=data.session.user; await loadAll(); S.screen='dash'; }
+  if(data.session){ S.user=data.session.user; await loadAll(); S.onb=0; S.screen=needsOnboarding()?'onboarding':'dash'; }
   else { S.screen='login'; }
   render();
 })();
