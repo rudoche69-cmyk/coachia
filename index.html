@@ -90,7 +90,7 @@ const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 if ('serviceWorker' in navigator) { window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); }); }
 try{ var __th=localStorage.getItem('coachia-theme'); if(__th) document.documentElement.setAttribute('data-theme',__th); }catch(e){}
 
-const S = { screen:'login', user:null, profile:null, todayCheckin:null, todayScore:null, weights:[], lifts:[], chargeExo:null, history:[], athletes:[], selAthlete:null, selAthleteProfile:null, coachBusy:false, selWeights:[], nutrition:null, meals:[], genNut:false, foodLog:[], foodMode:'simple', runs:[], checkinCount:0, comps:[], chat:[], aiThinking:false, report:null, reportLoading:false, runPlan:null, selRun:null, muscu:null, selMuscuDay:null, leaderboard:null, tests:[], calY:null, calM:null, calSel:null, workout:null, exercises:[], started:false, generating:false, msg:null };
+const S = { screen:'login', user:null, profile:null, todayCheckin:null, todayScore:null, weights:[], lifts:[], chargeExo:null, history:[], athletes:[], selAthlete:null, selAthleteProfile:null, coachBusy:false, selWeights:[], nutrition:null, meals:[], genNut:false, foodLog:[], foodMode:'simple', runs:[], checkinCount:0, comps:[], chat:[], aiThinking:false, report:null, reportLoading:false, runPlan:null, selRun:null, muscu:null, selMuscuDay:null, selExo:null, selExoAlts:null, leaderboard:null, tests:[], calY:null, calM:null, calSel:null, workout:null, exercises:[], started:false, generating:false, msg:null };
 function ymd(d){ return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2); }
 const today = () => ymd(new Date());
 /* Base d'aliments (valeurs pour 100 g) : [nom, kcal, protéines, glucides, lipides] */
@@ -1057,7 +1057,7 @@ function scrMuscuDay(){
   var head='<div class="banner" style="background:var(--accent-soft)"><i class="ti ti-barbell" style="color:var(--accent)"></i><div class="x" style="color:#1742a5"><b>Semaine '+d.week+' · '+esc(d.label)+'</b><br><span style="color:var(--ink)">'+ds+'</span></div></div>';
   var hint='<div class="banner" style="background:var(--amber-bg)"><i class="ti ti-bulb" style="color:var(--amber)"></i><div class="x" style="color:#7a4a12">'+esc(muscuWeekHint(d.week,S.muscu.weeks,d.deload))+'</div></div>';
   var list=d.exercises.map(function(e,i){
-    return '<div class="ex"><div class="n">'+(i+1)+'</div><div class="m"><div class="nm">'+esc(e.name)+'</div><div class="ds">'+e.sets+' séries × '+esc(e.reps)+' · repos '+esc(e.rest||'2 min')+'</div><div style="margin-top:7px;display:flex;align-items:center;gap:8px"><span style="font-size:10px;color:var(--faint);font-weight:700">CHARGE</span><input id="mx-'+i+'" type="text" value="'+esc(e.load||'')+'" placeholder="ex : 40 kg" style="width:110px;border:1px solid var(--line);border-radius:9px;padding:7px;font:inherit;font-size:13px;font-weight:700;text-align:center;background:var(--bg);color:var(--ink)"></div></div></div>';
+    return '<div class="ex"><div class="n">'+(i+1)+'</div><div class="m"><div class="nm">'+esc(e.name)+'</div><div class="ds">'+e.sets+' séries × '+esc(e.reps)+' · repos '+esc(e.rest||'2 min')+'</div><span onclick="openExo('+i+')" style="display:inline-block;margin-top:5px;font-size:11px;font-weight:700;color:var(--accent);cursor:pointer"><i class="ti ti-info-circle" style="vertical-align:-2px"></i> Technique / remplacer ›</span><div style="margin-top:7px;display:flex;align-items:center;gap:8px"><span style="font-size:10px;color:var(--faint);font-weight:700">CHARGE</span><input id="mx-'+i+'" type="text" value="'+esc(e.load||'')+'" placeholder="ex : 40 kg" style="width:110px;border:1px solid var(--line);border-radius:9px;padding:7px;font:inherit;font-size:13px;font-weight:700;text-align:center;background:var(--bg);color:var(--ink)"></div></div></div>';
   }).join('');
   var btnDone=d.done?'<div class="banner" style="background:var(--green-bg)"><i class="ti ti-circle-check" style="color:var(--green)"></i><div class="x" style="color:var(--green)"><b>Séance faite — bravo !</b></div></div><button class="btn outline" onclick="doToggleMuscuDone()">Annuler « faite »</button>':'<button class="btn" onclick="doToggleMuscuDone()"><i class="ti ti-check"></i> Marquer comme faite</button>';
   var eqCur=d.equip||(S.muscu&&S.muscu.equip)||'';
@@ -1089,6 +1089,64 @@ async function doRegenMuscuDay(){
   d.equip=equip;
   try{ await db.from('profiles').update({muscu_program:S.muscu}).eq('id',S.user.id); if(S.profile)S.profile.muscu_program=S.muscu; S.msg={k:'ok',t:'Séance régénérée pour : '+equip}; }catch(e){ S.msg={k:'err',t:'Erreur : '+(e.message||e)}; }
   render();
+}
+function exoInfo(name){
+  var n=(name||'').toLowerCase();
+  var K=[
+    ['leg curl','Allongé ou assis sur la machine, chevilles sous le rouleau. Fléchis les genoux pour amener les talons vers les fessiers en contractant l’arrière de la cuisse, puis redescends lentement.','Garde le bassin plaqué, pas d’à-coups.'],
+    ['développé couché','Allongé sur le banc, pieds au sol, omoplates serrées. Descends la barre/haltères vers le milieu de la poitrine (coudes ~45°) puis pousse vers le haut.','Ne rebondis pas sur la poitrine.'],
+    ['développé incliné','Comme le développé couché mais banc incliné (~30°) : cible le haut des pectoraux.','Évite une inclinaison trop forte (épaules).'],
+    ['développé militaire','Debout ou assis, gaine les abdos, pousse la charge au-dessus de la tête jusqu’à bras tendus.','Ne cambre pas le bas du dos.'],
+    ['squat','Pieds largeur épaules. Pousse les fesses en arrière, dos droit, descends jusqu’aux cuisses parallèles, puis remonte en poussant dans les talons.','Genoux dans l’axe des pieds, talons au sol.'],
+    ['soulevé de terre','Barre près des tibias, dos droit et gainé. Pousse dans le sol en tendant hanches et genoux ensemble.','Ne jamais arrondir le dos.'],
+    ['fente','Grand pas en avant, descends le genou arrière vers le sol, buste droit, puis remonte.','Le genou avant ne part pas trop devant la pointe du pied.'],
+    ['traction','Suspendu à la barre, tire le menton au-dessus de la barre en serrant le dos.','Évite de te balancer.'],
+    ['rowing','Buste penché ~45°, dos droit. Tire la charge vers le nombril en serrant les omoplates.','Tire avec le dos, pas seulement les bras.'],
+    ['tirage','Assis, tire la barre vers le haut de la poitrine en descendant les coudes.','Ne te penche pas trop en arrière.'],
+    ['curl','Coudes fixés le long du corps, monte la charge en fléchissant les coudes (biceps).','Ne balance pas le buste.'],
+    ['dips','Sur barres/chaises, descends en fléchissant les coudes jusqu’à ~90°, puis pousse.','Descente contrôlée, sans forcer sur l’épaule.'],
+    ['pompes','Corps gainé, mains largeur épaules. Descends la poitrine près du sol (coudes ~45°) puis pousse.','Corps aligné, pas de fesses hautes/basses.'],
+    ['pike','En V inversé (fesses hautes), fléchis les coudes pour descendre la tête vers le sol (épaules).','Regarde entre tes pieds.'],
+    ['élévation','Debout, monte les haltères/élastique sur les côtés jusqu’à l’horizontale (épaules).','Léger, coudes un peu fléchis, pas d’élan.'],
+    ['mollets','Monte sur la pointe des pieds le plus haut possible, puis redescends lentement.','Amplitude complète, contrôle la descente.'],
+    ['pont fessier','Allongé, pieds au sol, monte le bassin en serrant fort les fessiers, puis redescends.','Serre les fessiers en haut, ne cambre pas.'],
+    ['gainage','Planche sur les avant-bras, corps aligné, abdos et fessiers contractés. Tiens la position.','Ne creuse pas le bas du dos.'],
+    ['presse','Assis sur la machine, pousse la plateforme avec les jambes sans verrouiller violemment les genoux.','Ne décolle pas les fesses du dossier.'],
+    ['face pull','Poulie haute avec corde : tire vers le visage en écartant les mains (arrière d’épaule).','Coudes hauts, mouvement lent.'],
+    ['triceps','Coudes fixes, tends les bras pour contracter l’arrière du bras.','Garde les coudes immobiles.'],
+    ['superman','À plat ventre, décolle simultanément bras et jambes en contractant les lombaires.','Mouvement court, sans forcer le cou.'],
+    ['chaise','Dos contre un mur, cuisses parallèles au sol (comme assis sur une chaise invisible), tiens.','Genoux à 90°, dos plaqué au mur.']
+  ];
+  for(var i=0;i<K.length;i++){ if(n.indexOf(K[i][0])>=0) return {how:K[i][1],tip:K[i][2]}; }
+  return {how:'Réalise le mouvement de façon contrôlée, sur toute l’amplitude, dos gainé. En cas de doute, regarde une vidéo de démonstration ci-dessous.', tip:'Commence léger pour bien maîtriser la technique avant de charger.'};
+}
+function openVideo(name){ try{ window.open('https://www.youtube.com/results?search_query='+encodeURIComponent((name||'')+' exercice technique'),'_blank'); }catch(e){} }
+function openExo(ei){ S.selExo=ei; S.screen='exodetail'; render(); }
+function scrExoDetail(){
+  var idx=S.selMuscuDay; if(idx==null||!S.muscu) return scrMuscu();
+  var d=S.muscu.days[idx]; var ei=S.selExo; if(ei==null||!d.exercises[ei]) return scrMuscuDay();
+  var e=d.exercises[ei]; var info=exoInfo(e.name);
+  var tb='<div class="tbar"><button class="ic" onclick="go(\'muscuday\')"><i class="ti ti-chevron-left"></i></button><h2 style="font-size:18px">'+esc(e.name)+'</h2><span style="width:38px"></span></div>';
+  var msg=S.msg?'<div class="msg '+S.msg.k+'">'+S.msg.t+'</div>':'';
+  var meta='<div class="card"><div class="row"><span class="sub">Objectif du jour</span><span class="sub" style="font-weight:700;color:var(--ink)">'+e.sets+' séries × '+esc(e.reps)+'</span></div></div>';
+  var proto='<div class="card"><div class="label" style="margin-bottom:6px">Comment bien le réaliser</div><div class="sub" style="color:var(--ink);line-height:1.6">'+esc(info.how)+'</div><div class="banner" style="background:var(--amber-bg);margin-top:10px"><i class="ti ti-bulb" style="color:var(--amber)"></i><div class="x" style="color:#7a4a12">'+esc(info.tip)+'</div></div></div>';
+  var video='<button class="btn" onclick="openVideo(\''+esc(e.name).replace(/[^A-Za-zÀ-ÿ0-9 ()\/-]/g,'')+'\')"><i class="ti ti-brand-youtube"></i> Voir une démo en vidéo</button>';
+  var tier=muscuEquipTier(d.equip||(S.muscu&&S.muscu.equip)||'Salle de sport (basique)');
+  var grp=d.grp||grpFromLabel(d.label);
+  var lib=muscuExo(grp,tier);
+  var used=d.exercises.map(function(x){return x.name;});
+  var alts=lib.filter(function(a){return used.indexOf(a[0])<0;});
+  S.selExoAlts=alts;
+  var altRows=alts.length?alts.map(function(a,ai){ return '<div class="ex"><div class="m"><div class="nm">'+esc(a[0])+'</div><div class="ds">'+a[1]+' × '+esc(a[2])+'</div></div><button class="btn outline" style="width:auto;margin-top:0;padding:8px 12px" onclick="doSwapExo('+ai+')">Choisir</button></div>'; }).join(''):'<div class="sub" style="padding:8px 0">Aucune autre option pour ce matériel.</div>';
+  return tb+msg+meta+proto+video+'<div class="label" style="margin:14px 2px 8px">Machine occupée / indisponible ? Remplace par :</div><div class="card" style="padding:6px 14px">'+altRows+'</div>';
+}
+async function doSwapExo(ai){
+  var idx=S.selMuscuDay; if(idx==null||!S.muscu) return; var d=S.muscu.days[idx]; var ei=S.selExo; var alt=(S.selExoAlts||[])[ai];
+  if(!alt||d.exercises[ei]==null) return;
+  var base=muscuLastLoad(alt[0]); var load=base?((d.deload?Math.round(base*0.9):base)+' kg'):'';
+  d.exercises[ei]={name:alt[0], sets:(d.deload?Math.max(2,alt[1]-1):alt[1]), reps:alt[2], load:load, rest:'2 min', done:false};
+  try{ await db.from('profiles').update({muscu_program:S.muscu}).eq('id',S.user.id); if(S.profile)S.profile.muscu_program=S.muscu; S.msg={k:'ok',t:'Exercice remplacé.'}; }catch(e){ S.msg={k:'err',t:'Erreur : '+(e.message||e)}; }
+  S.screen='muscuday'; render();
 }
 /* ===== PROGRAMME COMPLET (muscu + course couplés selon l'objectif) ===== */
 function weekSlots(n){ return [[0],[0,3],[0,2,4],[0,2,4,6],[0,1,3,4,6],[0,1,2,4,5,6]][Math.min(Math.max(n,1),6)-1]; }
@@ -1228,7 +1286,7 @@ function render(extra){
   if(S.screen==='login'){ html=scrLogin(); nav.style.display='none'; }
   else if(S.screen==='result'){ html=scrResult(extra); nav.style.display='flex'; nav.innerHTML=navBar(); }
   else { nav.style.display='flex'; nav.innerHTML=navBar();
-    html = S.screen==='checkin'?scrCheckin():(S.screen==='workout'?scrWorkout():(S.screen==='profile'?scrProfile():(S.screen==='genopts'?scrGenOptions():(S.screen==='charges'?scrCharges():(S.screen==='calendar'?scrCalendar():(S.screen==='coach'?scrCoach():(S.screen==='coachDetail'?scrCoachDetail():(S.screen==='nutrition'?scrNutrition():(S.screen==='runs'?scrRuns():(S.screen==='badges'?scrBadges():(S.screen==='feedback'?scrFeedback():(S.screen==='comps'?scrComps():(S.screen==='assistant'?scrAssistant():(S.screen==='report'?scrReport():(S.screen==='runplanopts'?scrRunPlanOpts():(S.screen==='runsession'?scrRunSession():(S.screen==='newathlete'?scrNewAthlete():(S.screen==='athleteEdit'?scrAthleteEdit():(S.screen==='muscu'?scrMuscu():(S.screen==='muscuopts'?scrMuscuOpts():(S.screen==='muscuday'?scrMuscuDay():(S.screen==='leaderboard'?scrLeaderboard():(S.screen==='groupsession'?scrGroupSession():(S.screen==='programopts'?scrProgramOpts():(S.screen==='tests'?scrTests():scrDash())))))))))))))))))))))))));
+    html = S.screen==='checkin'?scrCheckin():(S.screen==='workout'?scrWorkout():(S.screen==='profile'?scrProfile():(S.screen==='genopts'?scrGenOptions():(S.screen==='charges'?scrCharges():(S.screen==='calendar'?scrCalendar():(S.screen==='coach'?scrCoach():(S.screen==='coachDetail'?scrCoachDetail():(S.screen==='nutrition'?scrNutrition():(S.screen==='runs'?scrRuns():(S.screen==='badges'?scrBadges():(S.screen==='feedback'?scrFeedback():(S.screen==='comps'?scrComps():(S.screen==='assistant'?scrAssistant():(S.screen==='report'?scrReport():(S.screen==='runplanopts'?scrRunPlanOpts():(S.screen==='runsession'?scrRunSession():(S.screen==='newathlete'?scrNewAthlete():(S.screen==='athleteEdit'?scrAthleteEdit():(S.screen==='muscu'?scrMuscu():(S.screen==='muscuopts'?scrMuscuOpts():(S.screen==='muscuday'?scrMuscuDay():(S.screen==='exodetail'?scrExoDetail():(S.screen==='leaderboard'?scrLeaderboard():(S.screen==='groupsession'?scrGroupSession():(S.screen==='programopts'?scrProgramOpts():(S.screen==='tests'?scrTests():scrDash()))))))))))))))))))))))))));
   }
   sc.innerHTML=html; sc.scrollTop=0; S.msg=null;
   const e=document.getElementById('i-email'); if(e) e.addEventListener('keydown',ev=>{if(ev.key==='Enter')document.getElementById('i-pass').focus();});
