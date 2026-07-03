@@ -454,6 +454,9 @@ async function openAthlete(id){
   for(var i=0;i<S.athletes.length;i++){ if(S.athletes[i].id===id){ S.selAthlete=S.athletes[i]; break; } }
   try{ var pr=await db.from('profiles').select('*').eq('id',id).maybeSingle(); S.selAthleteProfile=pr.data||null; }catch(_){ S.selAthleteProfile=null; }
   try{ var wr=await db.from('daily_checkins').select('date,weight').eq('athlete_id',id).not('weight','is',null).order('date',{ascending:true}).limit(30); S.selWeights=wr.data||[]; }catch(_){ S.selWeights=[]; }
+  try{ var lr=await db.from('workout_exercises').select('name,actual_load,workouts!inner(date,athlete_id)').eq('workouts.athlete_id',id).not('actual_load','is',null); S.selLifts=(lr.data||[]).map(function(r){return {name:r.name,load:Number(r.actual_load),date:(r.workouts&&r.workouts.date)||''};}).sort(function(a,b){return a.date<b.date?-1:1;}); }catch(_){ S.selLifts=[]; }
+  try{ var tr=await db.from('fitness_tests').select('*').eq('athlete_id',id).order('date',{ascending:false}).limit(100); S.selTests=tr.data||[]; }catch(_){ S.selTests=[]; }
+  try{ var d30=new Date(); d30.setDate(d30.getDate()-30); var since=ymd(d30); var hr=await db.from('workouts').select('date,status').eq('athlete_id',id).gte('date',since); S.selHist=hr.data||[]; }catch(_){ S.selHist=[]; }
   S.screen='coachDetail'; render();
 }
 function scrCoachDetail(){
@@ -471,12 +474,31 @@ function scrCoachDetail(){
   var chipsD=ald.length?ald.map(function(z){ return '<span style="display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:600;color:'+alertColor(z.lvl)+';background:'+alertBg(z.lvl)+';padding:2px 8px;border-radius:20px;margin:0 4px 4px 0"><i class="ti '+z.icon+'"></i>'+esc(z.t)+'</span>'; }).join(''):'<span class="pill g">Aucune alerte</span>';
   var ciTxt=lcd?('Sommeil '+(lcd.sleep!=null?lcd.sleep+'/10':'—')+' · Fatigue '+(lcd.fatigue!=null?lcd.fatigue+'/10':'—')+' · Motivation '+(lcd.motivation!=null?lcd.motivation+'/10':'—')+(lcd.pain?' · douleur signalée':'')+' — '+(daysSince(lcd.date)<=0?'aujourd\'hui':(daysSince(lcd.date)===1?'hier':'il y a '+daysSince(lcd.date)+' j'))):'Aucun check-in enregistré pour l\'instant.';
   var etat='<div class="card"><div class="label" style="margin-bottom:7px">État du jour</div><div style="margin-bottom:8px">'+chipsD+'</div><div class="sub" style="color:var(--ink)">'+esc(ciTxt)+'</div></div>';
+  function lst(t){ var a=S.selTests||[]; for(var i=0;i<a.length;i++){ if(a[i].type===t) return a[i]; } return null; }
+  var lifts=S.selLifts||[]; var byName={}; lifts.forEach(function(z){ (byName[z.name]=byName[z.name]||[]).push(z); }); var nExos=Object.keys(byName).length;
+  var hist=S.selHist||[]; var hdone=hist.filter(function(w){return w.status==='realisee';}).length; var htot=hist.length; var adh=htot?Math.round(hdone/htot*100):0;
+  var adhCol=adh>=70?'var(--green)':(adh>=40?'var(--amber)':'var(--red)');
+  var stats='<div class="row" style="gap:8px;margin-bottom:13px"><div class="card flat" style="flex:1;margin:0;text-align:center;padding:12px"><div class="big" style="font-size:20px;color:var(--accent)">'+hdone+'/'+htot+'</div><div class="label">Séances 30 j</div></div><div class="card flat" style="flex:1;margin:0;text-align:center;padding:12px"><div class="big" style="font-size:20px;color:'+adhCol+'">'+adh+'%</div><div class="label">Adhérence</div></div><div class="card flat" style="flex:1;margin:0;text-align:center;padding:12px"><div class="big" style="font-size:20px;color:var(--accent)">'+nExos+'</div><div class="label">Exos suivis</div></div></div>';
+  var chargesCard='';
+  if(lifts.length){
+    var lrows=Object.keys(byName).slice(0,7).map(function(nm){ var arr=byName[nm]; var first=arr[0].load,last=arr[arr.length-1].load,delta=Math.round((last-first)*10)/10; var col=delta>0?'var(--green)':(delta<0?'var(--red)':'var(--muted)'); var sign=delta>0?'+':''; return '<div class="row" style="justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--line)"><span style="font-size:13px;flex:1">'+esc(nm)+'</span><span style="font-size:13px;font-weight:700">'+last+' kg</span>'+(arr.length>1?'<span style="font-size:11px;font-weight:600;color:'+col+';margin-left:10px;min-width:52px;text-align:right">'+sign+delta+' kg</span>':'<span style="min-width:52px"></span>')+'</div>'; }).join('');
+    chargesCard='<div class="card"><div class="label" style="margin-bottom:2px">Progression des charges</div>'+lrows+'<div class="sub" style="font-size:11px;margin-top:7px">Écart entre la 1ʳᵉ et la dernière charge saisie.</div></div>';
+  }
+  var pftT=lst('pft'),vmaT=lst('vma'),forceT=lst('force'),ppT=lst('pompes'),traT=lst('tractions'),gaT=lst('gainage');
+  var tlines=[];
+  if(pftT) tlines.push('Hyrox P\'F"T : <b>'+pftT.value+' min</b> → '+esc(pftT.note||pftDivision(pftT.value)));
+  if(vmaT) tlines.push('VMA : <b>'+vmaT.value+' km/h</b> → seuil '+fmtPace(60/(vmaT.value*0.85)));
+  if(forceT) tlines.push('Force : <b>'+forceT.value+' kg</b>'+(forceT.note?' ('+esc(forceT.note)+')':''));
+  if(ppT) tlines.push('Pompes : <b>'+ppT.value+'</b>');
+  if(traT) tlines.push('Tractions : <b>'+traT.value+'</b>');
+  if(gaT) tlines.push('Gainage : <b>'+gaT.value+' s</b>');
+  var testsCard=tlines.length?'<div class="card"><div class="label" style="margin-bottom:6px">Derniers tests</div><div class="sub" style="color:var(--ink);line-height:1.9">'+tlines.join('<br>')+'</div></div>':'';
   var busy=S.coachBusy?'<div class="banner" style="background:var(--accent-soft)"><div class="spin" style="border-color:var(--accent);border-top-color:transparent"></div><div class="x" style="color:#1742a5">Génération en cours… quelques secondes.</div></div>':'';
   var actions='<button class="btn" onclick="doGenForAthlete(\'workout\')"'+(S.coachBusy?' disabled':'')+'><i class="ti ti-sparkles"></i> Générer sa séance du jour</button>'+
     '<button class="btn ghost" style="margin-top:9px" onclick="doGenForAthlete(\'nutrition\')"'+(S.coachBusy?' disabled':'')+'><i class="ti ti-salad"></i> Générer sa nutrition</button>'+
     '<button class="btn outline" style="margin-top:9px" onclick="go(\'athleteEdit\')"><i class="ti ti-edit"></i> Modifier son profil / objectif</button>'+
     '<button class="btn outline" style="margin-top:9px;color:var(--red);border-color:var(--red)" onclick="doDeleteAthlete()"><i class="ti ti-trash"></i> Supprimer ce compte</button>';
-  return tb+msg+head+etat+info+wt+busy+actions;
+  return tb+msg+head+etat+stats+chargesCard+testsCard+info+wt+busy+actions;
 }
 async function doGenForAthlete(kind){
   if(!S.selAthlete){ return; }
