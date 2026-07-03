@@ -1479,48 +1479,79 @@ function scrGoals(){
   }).join('') : '<div class="sub" style="padding:12px 2px">Aucun objectif pour l\'instant. Ajoute-en un ci-dessous.</div>';
   return tb+msg+info+'<button class="btn" onclick="openGoalEdit(-1)"><i class="ti ti-plus"></i> Ajouter un objectif</button>'+'<div class="card" style="padding:4px 14px;margin-top:12px">'+rows+'</div>';
 }
-function goalSlot(i,t){
-  t=t||{};
-  var types=[['','— Aucune —'],['poids','Poids (kg)'],['charge','Charge sur un exercice (kg)'],['chrono','Chrono course (min)'],['distance','Distance (km ou m)'],['reps','Répétitions'],['perso','Autre (personnalisé)']];
-  return '<div class="label" style="margin:12px 2px 4px;color:var(--accent)">Cible '+i+' (facultatif)</div>'+
-    selField('ge-type-'+i,'Que veux-tu suivre ?',t.type||'',types)+
-    inField('ge-label-'+i,'Exercice (si charge)',t.label,'text','ex : Squat, Développé couché')+
-    inField('ge-unit-'+i,'Unité',t.unit,'text','kg, min, km…')+
-    inField('ge-start-'+i,'Valeur de départ',t.start,'number','ex : 82')+
-    inField('ge-target-'+i,'Valeur cible',t.target,'number','ex : 75')+
-    inField('ge-current-'+i,'Valeur actuelle (chrono / distance / perso)',t.current,'number','vide pour poids/force (auto)');
+function typeSelect(k,cur){ var opts=[['','— choisis —'],['poids','Mon poids'],['charge','Ma force sur un exercice'],['chrono','Mon temps de course'],['distance','Ma distance'],['reps','Mes répétitions'],['perso','Autre']]; var o=opts.map(function(x){return '<option value="'+x[0]+'"'+(cur===x[0]?' selected':'')+'>'+x[1]+'</option>';}).join(''); return '<div class="card"><div class="flabel">Que veux-tu suivre ?</div><select class="in" id="ge-type-'+k+'" onchange="onTypeChange('+k+')">'+o+'</select></div>'; }
+function autoNote(txt){ return '<div class="banner" style="background:var(--bg);margin-top:-4px"><i class="ti ti-bolt" style="color:var(--accent)"></i><div class="x" style="color:var(--muted)">'+txt+'</div></div>'; }
+function goalSlotV2(k){
+  var t=S.gEdit.targets[k]||{};
+  var head='<div class="row" style="margin:14px 2px 2px;align-items:center"><div class="label" style="color:var(--accent)">Ce que je suis n°'+(k+1)+'</div><span class="sub" style="color:var(--red);cursor:pointer" onclick="removeTarget('+k+')"><i class="ti ti-x" style="vertical-align:-2px"></i> Retirer</span></div>';
+  var sel=typeSelect(k,t.type||'');
+  var f='';
+  if(t.type==='poids'){ f=inField('ge-target-'+k,'Poids visé (kg)',t.target,'number','ex : 75')+autoNote('Ton poids actuel est pris automatiquement depuis tes check-ins — rien à saisir.'); }
+  else if(t.type==='charge'){ f=inField('ge-label-'+k,'Sur quel exercice ?',t.label,'text','ex : Squat')+inField('ge-target-'+k,'Charge visée (kg)',t.target,'number','ex : 100')+autoNote('Ta meilleure charge saisie sert de point de départ — automatique.'); }
+  else if(t.type==='chrono'){ f=inField('ge-current-'+k,'Ton temps actuel (min)',t.current,'number','ex : 60')+inField('ge-target-'+k,'Temps visé (min)',t.target,'number','ex : 50'); }
+  else if(t.type==='distance'){ f=inField('ge-current-'+k,'Distance actuelle',t.current,'number','ex : 5')+inField('ge-target-'+k,'Distance visée',t.target,'number','ex : 10')+inField('ge-unit-'+k,'Unité',t.unit||'km','text','km ou m'); }
+  else if(t.type==='reps'){ f=inField('ge-current-'+k,'Répétitions actuelles',t.current,'number','ex : 5')+inField('ge-target-'+k,'Objectif de répétitions',t.target,'number','ex : 20'); }
+  else if(t.type==='perso'){ f=inField('ge-label-'+k,'Nom de la mesure',t.label,'text','ex : tour de taille')+inField('ge-current-'+k,'Valeur actuelle',t.current,'number','')+inField('ge-target-'+k,'Valeur visée',t.target,'number','')+inField('ge-unit-'+k,'Unité',t.unit,'text','cm, kg…'); }
+  return head+sel+f;
 }
+function gEditSync(){
+  if(!S.gEdit) return;
+  var val=function(x){var e=document.getElementById(x);return e?e.value:null;};
+  var d=val('ge-disc'); if(d!=null) S.gEdit.discipline=d;
+  var dl=val('ge-deadline'); if(dl!=null) S.gEdit.deadline=dl||null;
+  for(var k=0;k<S.gEdit.targets.length;k++){
+    var ty=val('ge-type-'+k); if(ty!=null) S.gEdit.targets[k].type=ty;
+    var lb=val('ge-label-'+k); if(lb!=null) S.gEdit.targets[k].label=lb;
+    var un=val('ge-unit-'+k); if(un!=null) S.gEdit.targets[k].unit=un;
+    var tg=val('ge-target-'+k); if(tg!=null) S.gEdit.targets[k].target=tg;
+    var cu=val('ge-current-'+k); if(cu!=null) S.gEdit.targets[k].current=cu;
+  }
+}
+function onTypeChange(k){ gEditSync(); render(); }
+function addTarget(){ gEditSync(); if(!S.gEdit.targets) S.gEdit.targets=[]; if(S.gEdit.targets.length<3) S.gEdit.targets.push({type:''}); render(); }
+function removeTarget(k){ gEditSync(); S.gEdit.targets.splice(k,1); render(); }
 function scrGoalEdit(){
-  var self=!S.goalFor;
-  var gs=getGoals(self); var idx=(S.goalIdx==null?-1:S.goalIdx);
-  var gd=(idx>=0&&gs[idx])?gs[idx]:{discipline:'',deadline:null,targets:[]};
-  var ts=gd.targets||[];
+  if(!S.gEdit) S.gEdit={discipline:'',deadline:null,targets:[]};
+  var g=S.gEdit; var idx=(S.goalIdx==null?-1:S.goalIdx);
   var tb='<div class="tbar"><button class="ic" onclick="go(\'goals\')"><i class="ti ti-chevron-left"></i></button><h2 style="font-size:19px">'+(idx>=0?'Modifier l\'objectif':'Nouvel objectif')+'</h2><span style="width:38px"></span></div>';
   var msg=S.msg?'<div class="msg '+S.msg.k+'">'+S.msg.t+'</div>':'';
-  var info='<div class="banner" style="background:var(--accent-soft)"><i class="ti ti-info-circle" style="color:var(--accent)"></i><div class="x" style="color:#1742a5">Choisis la <b>discipline</b> (elle guide tes séances). Tu peux ajouter <b>jusqu\'à 3 cibles chiffrées</b> à suivre en même temps (ex. chrono + force + poids) : les paliers se génèrent tout seuls.</div></div>';
+  var info='<div class="banner" style="background:var(--accent-soft)"><i class="ti ti-info-circle" style="color:var(--accent)"></i><div class="x" style="color:#1742a5">1) Choisis ta <b>discipline</b>. 2) Si tu veux, ajoute un ou plusieurs <b>chiffres à suivre</b> — seuls les champs utiles s\'affichent, et la progression se calcule toute seule.</div></div>';
+  var slots=(g.targets||[]).map(function(t,k){ return goalSlotV2(k); }).join('');
+  var addBtn=(g.targets&&g.targets.length>=3)?'':'<button class="btn outline" onclick="addTarget()" style="margin-top:6px"><i class="ti ti-plus"></i> '+((g.targets&&g.targets.length)?'Ajouter un autre chiffre à suivre':'Suivre un chiffre (poids, force, chrono…)')+'</button>';
   return tb+msg+info+
-    selField('ge-disc','Discipline (type d\'entraînement)',gd.discipline,GOAL_DISCIPLINES.map(function(x){return [x,x];}))+
-    inField('ge-deadline','Date cible (facultatif)',gd.deadline,'date','')+
-    '<div class="label" style="margin:12px 2px 2px">Cibles chiffrées (plusieurs possibles)</div>'+
-    goalSlot(1,ts[0])+goalSlot(2,ts[1])+goalSlot(3,ts[2])+
-    '<button class="btn" id="b-goal" onclick="doSaveGoalEdit()" style="margin-top:12px"><i class="ti ti-check"></i> Enregistrer</button>';
+    selField('ge-disc','Ta discipline (ce que tu prépares)',g.discipline,GOAL_DISCIPLINES.map(function(x){return [x,x];}))+
+    inField('ge-deadline','Une date visée ? (facultatif)',g.deadline,'date','')+
+    slots+addBtn+
+    '<button class="btn" id="b-goal" onclick="doSaveGoalEdit()" style="margin-top:14px"><i class="ti ti-check"></i> Enregistrer</button>';
+}
+function baselineFor(t, self){
+  if(t.type==='poids'){ var w=self?(S.weights||[]):(S.selWeights||[]); if(self&&S.todayCheckin&&S.todayCheckin.weight!=null) return Number(S.todayCheckin.weight); return w.length?Number(w[w.length-1].weight):null; }
+  if(t.type==='charge'){ var lifts=self?(S.lifts||[]):(S.selLifts||[]); var lbl=(t.label||'').toLowerCase().trim(); var best=null; lifts.forEach(function(l){ if(!lbl||(l.name||'').toLowerCase().indexOf(lbl)>=0){ if(best==null||l.load>best) best=l.load; } }); return best; }
+  return null;
 }
 function openMyGoals(){ S.goalFor=null; S.screen='goals'; render(); }
 function openAthleteGoals(){ if(!S.selAthlete) return; S.goalFor=S.selAthlete.id; S.screen='goals'; render(); }
-function openGoalEdit(i){ S.goalIdx=i; S.screen='goaledit'; render(); }
+function openGoalEdit(i){ var self=!S.goalFor; var gs=getGoals(self); S.goalIdx=i; if(i>=0&&gs[i]){ S.gEdit=JSON.parse(JSON.stringify(gs[i])); } else { S.gEdit={discipline:'',deadline:null,targets:[]}; } if(!S.gEdit.targets) S.gEdit.targets=[]; S.screen='goaledit'; render(); }
 async function doSaveGoalEdit(){
-  var self=!S.goalFor;
-  var g=function(x){var e=document.getElementById(x);return e?e.value.trim():'';};
-  var disc=g('ge-disc'); if(!disc){ S.msg={k:'err',t:'Choisis une discipline.'}; render(); return; }
-  var deadline=g('ge-deadline')||null;
+  gEditSync();
+  var self=!S.goalFor; var g=S.gEdit||{discipline:'',targets:[]};
+  if(!g.discipline){ S.msg={k:'err',t:'Choisis ta discipline.'}; render(); return; }
+  var num=function(v){ return (v!=null&&String(v).trim()!=='')?parseFloat(v):null; };
   var targets=[];
-  for(var i=1;i<=3;i++){ var type=g('ge-type-'+i); if(!type) continue; var tv=g('ge-target-'+i); if(tv===''||isNaN(parseFloat(tv))){ S.msg={k:'err',t:'Cible '+i+' : indique une valeur cible (ou remets « Aucune »).'}; render(); return; } targets.push({ type:type, label:g('ge-label-'+i)||null, unit:(g('ge-unit-'+i)||goalUnitDefault(type)), start:(g('ge-start-'+i)!==''?parseFloat(g('ge-start-'+i)):null), target:parseFloat(tv), current:(g('ge-current-'+i)!==''?parseFloat(g('ge-current-'+i)):null) }); }
-  var goal={ discipline:disc, deadline:deadline, targets:targets };
+  var src=g.targets||[];
+  for(var k=0;k<src.length;k++){ var t=src[k]; if(!t.type) continue;
+    var tv=num(t.target); if(tv==null||isNaN(tv)){ S.msg={k:'err',t:'« Ce que je suis n°'+(k+1)+' » : indique la valeur visée (ou retire cette ligne).'}; render(); return; }
+    var start=num(t.start); if(start==null) start=baselineFor(t, self);
+    var cur=num(t.current);
+    if((t.type==='chrono'||t.type==='distance'||t.type==='reps'||t.type==='perso') && start==null) start=cur;
+    targets.push({ type:t.type, label:(t.label||null), unit:(t.unit||goalUnitDefault(t.type)), start:(start!=null?start:null), target:tv, current:(cur!=null?cur:null) });
+  }
+  var goal={ discipline:g.discipline, deadline:g.deadline||null, targets:targets };
   var gs=getGoals(self).slice(); var idx=(S.goalIdx==null?-1:S.goalIdx);
   if(idx>=0 && gs[idx]) gs[idx]=goal; else gs.push(goal);
   var btn=document.getElementById('b-goal'); if(btn){ btn.disabled=true; btn.innerHTML='<span class="spin"></span>'; }
   try{
-    await saveGoals(self, gs);
+    await saveGoals(self, gs); S.gEdit=null;
     S.msg={k:'ok',t:'Objectif enregistré.'}; S.screen='goals'; render();
   }catch(e){ S.msg={k:'err',t:'Erreur : '+(e.message||e)+' (la colonne goal_detail est-elle créée ?)'}; render(); }
 }
