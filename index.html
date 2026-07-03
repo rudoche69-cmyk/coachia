@@ -990,7 +990,7 @@ function buildMuscuProgram(split,perWeek,weeks,equip,start){
         var sets=deload?Math.max(2,e[1]-1):e[1];
         return {name:e[0], sets:sets, reps:e[2], load:load, rest:'2 min', done:false};
       });
-      days.push({ id:'w'+w+'d'+(s+1), week:w, label:muscuDayLabel(grp), date:addDays(start,(w-1)*7+offs[s%offs.length]), deload:deload, done:false, exercises:exs });
+      days.push({ id:'w'+w+'d'+(s+1), week:w, grp:grp, label:muscuDayLabel(grp), date:addDays(start,(w-1)*7+offs[s%offs.length]), deload:deload, done:false, exercises:exs });
     }
   }
   return {split:split, perWeek:perWeek, weeks:weeks, equip:equip, start:start, days:days};
@@ -1060,7 +1060,11 @@ function scrMuscuDay(){
     return '<div class="ex"><div class="n">'+(i+1)+'</div><div class="m"><div class="nm">'+esc(e.name)+'</div><div class="ds">'+e.sets+' séries × '+esc(e.reps)+' · repos '+esc(e.rest||'2 min')+'</div><div style="margin-top:7px;display:flex;align-items:center;gap:8px"><span style="font-size:10px;color:var(--faint);font-weight:700">CHARGE</span><input id="mx-'+i+'" type="text" value="'+esc(e.load||'')+'" placeholder="ex : 40 kg" style="width:110px;border:1px solid var(--line);border-radius:9px;padding:7px;font:inherit;font-size:13px;font-weight:700;text-align:center;background:var(--bg);color:var(--ink)"></div></div></div>';
   }).join('');
   var btnDone=d.done?'<div class="banner" style="background:var(--green-bg)"><i class="ti ti-circle-check" style="color:var(--green)"></i><div class="x" style="color:var(--green)"><b>Séance faite — bravo !</b></div></div><button class="btn outline" onclick="doToggleMuscuDone()">Annuler « faite »</button>':'<button class="btn" onclick="doToggleMuscuDone()"><i class="ti ti-check"></i> Marquer comme faite</button>';
-  return tb+msg+head+hint+'<div class="card" style="padding:6px 14px">'+list+'</div><button class="btn outline" onclick="doSaveMuscuLoads()" style="margin-bottom:9px"><i class="ti ti-device-floppy"></i> Enregistrer mes charges</button>'+btnDone;
+  var eqCur=d.equip||(S.muscu&&S.muscu.equip)||'';
+  var eqL=[['Salle de sport complète','Salle de sport complète'],['Salle de sport (basique)','Salle de sport (basique)'],['Matériel maison (haltères/barre)','Matériel maison (haltères/barre)'],['Petit matériel (élastiques, kettlebell)','Petit matériel (élastiques, kettlebell)'],['Sans matériel (poids du corps)','Sans matériel (poids du corps)']];
+  var eqOpts=eqL.map(function(x){return '<option value="'+x[0]+'"'+(eqCur===x[0]?' selected':'')+'>'+x[1]+'</option>';}).join('');
+  var regen='<div class="card"><div class="flabel">Pas le même matériel aujourd\'hui ? Régénère juste cette séance :</div><select class="in" id="md-equip">'+eqOpts+'</select><button class="btn outline" onclick="doRegenMuscuDay()" style="margin-top:9px"><i class="ti ti-refresh"></i> Régénérer cette séance</button></div>';
+  return tb+msg+head+hint+'<div class="card" style="padding:6px 14px">'+list+'</div><button class="btn outline" onclick="doSaveMuscuLoads()" style="margin-bottom:9px"><i class="ti ti-device-floppy"></i> Enregistrer mes charges</button>'+regen+btnDone;
 }
 async function doSaveMuscuLoads(){
   var idx=S.selMuscuDay; if(idx==null||!S.muscu) return; var d=S.muscu.days[idx];
@@ -1073,6 +1077,17 @@ async function doToggleMuscuDone(){
   d.exercises.forEach(function(e,i){ var el=document.getElementById('mx-'+i); if(el) e.load=el.value.trim(); });
   d.done=!d.done;
   try{ await db.from('profiles').update({muscu_program:S.muscu}).eq('id',S.user.id); if(S.profile)S.profile.muscu_program=S.muscu; }catch(e){}
+  render();
+}
+function grpFromLabel(lab){ lab=(lab||'').toLowerCase(); if(lab.indexOf('push')>=0)return 'push'; if(lab.indexOf('pull')>=0)return 'pull'; if(lab.indexOf('legs')>=0||lab.indexOf('jambe')>=0)return 'legs'; if(lab.indexOf('haut')>=0)return 'upper'; if(lab.indexOf('bas')>=0)return 'lower'; return 'full'; }
+async function doRegenMuscuDay(){
+  var idx=S.selMuscuDay; if(idx==null||!S.muscu) return; var d=S.muscu.days[idx];
+  var eqEl=document.getElementById('md-equip'); var equip=(eqEl&&eqEl.value)||d.equip||S.muscu.equip||'Salle de sport (basique)';
+  var grp=d.grp||grpFromLabel(d.label); var tier=muscuEquipTier(equip);
+  var lib=muscuExo(grp,tier);
+  d.exercises=lib.map(function(e){ var base=muscuLastLoad(e[0]); var load=base?((d.deload?Math.round(base*0.9):base)+' kg'):''; var sets=d.deload?Math.max(2,e[1]-1):e[1]; return {name:e[0],sets:sets,reps:e[2],load:load,rest:'2 min',done:false}; });
+  d.equip=equip;
+  try{ await db.from('profiles').update({muscu_program:S.muscu}).eq('id',S.user.id); if(S.profile)S.profile.muscu_program=S.muscu; S.msg={k:'ok',t:'Séance régénérée pour : '+equip}; }catch(e){ S.msg={k:'err',t:'Erreur : '+(e.message||e)}; }
   render();
 }
 /* ===== PROGRAMME COMPLET (muscu + course couplés selon l'objectif) ===== */
@@ -1129,7 +1144,7 @@ function buildUnifiedProgram(goal,offsets,weeks,equip,start,secondary){
       var lib=muscuExo(grp,tier);
       var deload=(w===weeks && weeks>=4);
       var exs=lib.map(function(e){ var base=muscuLastLoad(e[0]); var load=base?((deload?Math.round(base*0.9):base)+' kg'):''; var sets=deload?Math.max(2,e[1]-1):e[1]; return {name:e[0],sets:sets,reps:e[2],load:load,rest:'2 min',done:false}; });
-      mdays.push({id:'w'+w+'m'+(s+1), week:w, label:muscuDayLabel(grp), date:addDays(start,(w-1)*7+muscuOffs[s]), deload:deload, done:false, exercises:exs});
+      mdays.push({id:'w'+w+'m'+(s+1), week:w, grp:grp, label:muscuDayLabel(grp), date:addDays(start,(w-1)*7+muscuOffs[s]), deload:deload, done:false, exercises:exs});
     }
     var sess=[];
     for(var q=0;q<courseOffs.length;q++){ var ct=cTypes[q%cTypes.length]||'EF'; sess.push({id:'w'+w+'c'+(q+1), t:ct, m:unifiedCourseMain(ct,w), date:addDays(start,(w-1)*7+courseOffs[q]), done:false}); }
