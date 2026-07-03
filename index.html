@@ -134,6 +134,9 @@ function alertColor(lvl){ return lvl==='r'?'var(--red)':(lvl==='o'?'var(--amber)
 function alertBg(lvl){ return lvl==='r'?'var(--red-bg)':(lvl==='o'?'var(--amber-bg)':'var(--accent-soft)'); }
 function displayName(){ if(S.profile && S.profile.first_name) return S.profile.first_name; if(S.user && S.user.email) return S.user.email.split('@')[0]; return 'athlète'; }
 function esc(s){ return (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function pseudoClean(p){ return (p==null?'':String(p)).trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\s+/g,'.').replace(/[^a-z0-9._-]/g,''); }
+function pseudoToEmail(p){ var c=pseudoClean(p); return c?c+'@coachia.local':''; }
+function loginToEmail(v){ v=(v||'').trim(); return v.indexOf('@')>=0 ? v.toLowerCase() : pseudoToEmail(v); }
 
 async function loadAll(){
   const uid = S.user.id;
@@ -195,7 +198,7 @@ function weightSVG(rows){
 function scrLogin(){
   return '<div class="login"><div class="logo"><i class="ti ti-bolt"></i></div><h2 style="font-size:24px;font-weight:700;text-align:center">CoachIA</h2><p class="sub" style="text-align:center;margin:7px 0 22px">Connecte-toi à ton espace</p>'+
     (S.msg?'<div class="msg '+S.msg.k+'">'+S.msg.t+'</div>':'')+
-    '<div class="field"><label>E-mail</label><input id="i-email" type="email" autocomplete="username" placeholder="ton.email@exemple.fr"></div>'+
+    '<div class="field"><label>Pseudo</label><input id="i-email" type="text" autocapitalize="none" autocomplete="username" placeholder="ton pseudo"></div>'+
     '<div class="field"><label>Mot de passe</label><input id="i-pass" type="password" autocomplete="current-password" placeholder="••••••••"></div>'+
     '<button class="btn" id="b-login" onclick="doLogin()">Se connecter</button></div>';
 }
@@ -530,25 +533,28 @@ async function doDeleteAthlete(){
 function scrNewAthlete(){
   var tb='<div class="tbar"><button class="ic" onclick="go(\'coach\')"><i class="ti ti-chevron-left"></i></button><h2 style="font-size:19px">Créer un athlète</h2><span style="width:38px"></span></div>';
   var msg=S.msg?'<div class="msg '+S.msg.k+'">'+S.msg.t+'</div>':'';
-  return tb+msg+'<div class="banner" style="background:var(--accent-soft)"><i class="ti ti-info-circle" style="color:var(--accent)"></i><div class="x" style="color:#1742a5">Le compte est créé immédiatement. Transmets l\'e-mail et le mot de passe provisoire à ton athlète : il pourra se connecter et le changer ensuite.</div></div>'+
+  return tb+msg+'<div class="banner" style="background:var(--accent-soft)"><i class="ti ti-info-circle" style="color:var(--accent)"></i><div class="x" style="color:#1742a5">Le compte est créé immédiatement. Pas besoin d\'e-mail : transmets juste le <b>pseudo</b> et le <b>mot de passe</b> provisoire à ton athlète pour qu\'il se connecte.</div></div>'+
     inField('na-first','Prénom',null,'text','Prénom')+
     inField('na-last','Nom',null,'text','Nom (optionnel)')+
-    inField('na-email','E-mail',null,'email','athlete@exemple.fr')+
+    inField('na-pseudo','Pseudo (identifiant de connexion)',null,'text','ex : lea.martin')+
     inField('na-pass','Mot de passe provisoire',null,'text','au moins 6 caractères')+
     '<button class="btn" id="b-na" onclick="doCreateAthlete()"><i class="ti ti-user-plus"></i> Créer le compte</button>';
 }
 async function doCreateAthlete(){
   var g=function(id){var e=document.getElementById(id);return e?e.value.trim():'';};
-  var first=g('na-first'), last=g('na-last'), email=g('na-email'), pass=g('na-pass');
-  if(!email||!pass){ S.msg={k:'err',t:'E-mail et mot de passe sont obligatoires.'}; render(); return; }
+  var first=g('na-first'), last=g('na-last'), pseudo=g('na-pseudo'), pass=g('na-pass');
+  var pc=pseudoClean(pseudo);
+  if(!pc||!pass){ S.msg={k:'err',t:'Le pseudo et le mot de passe sont obligatoires.'}; render(); return; }
+  if(pc.length<3){ S.msg={k:'err',t:'Le pseudo doit faire au moins 3 caractères (lettres, chiffres, . _ -).'}; render(); return; }
   if(pass.length<6){ S.msg={k:'err',t:'Le mot de passe doit faire au moins 6 caractères.'}; render(); return; }
+  var email=pc+'@coachia.local';
   var btn=document.getElementById('b-na'); if(btn){ btn.disabled=true; btn.innerHTML='<span class="spin"></span>'; }
   try{
     var payload={email:email,password:pass,first_name:first,last_name:last};
     var r=await invokeFn('admin-create-athlete',payload);
     if(r.error){ r=await invokeFn('super-function',payload); }
-    if(r.error||(r.data&&r.data.error)){ var d=(r.data&&r.data.error)||(r.error&&r.error.message)||'erreur'; S.msg={k:'err',t:'Création impossible : '+d}; render(); return; }
-    await loadAll(); S.msg={k:'ok',t:'Compte créé ✅ À transmettre — e-mail : '+email+' · mot de passe : '+pass}; S.screen='coach'; render();
+    if(r.error||(r.data&&r.data.error)){ var d=(r.data&&r.data.error)||(r.error&&r.error.message)||'erreur'; if(/already|exist|registered|duplicate/i.test(d)) d='ce pseudo est déjà pris, choisis-en un autre.'; S.msg={k:'err',t:'Création impossible : '+d}; render(); return; }
+    await loadAll(); S.msg={k:'ok',t:'Compte créé ✅ À transmettre — pseudo : '+pc+' · mot de passe : '+pass}; S.screen='coach'; render();
   }catch(e){ S.msg={k:'err',t:'Erreur : '+(e.message||e)}; render(); }
 }
 function scrAthleteEdit(){
@@ -1391,8 +1397,9 @@ function render(extra){
 function go(s){ S.screen=s; render(); }
 
 async function doLogin(){
-  const email=document.getElementById('i-email').value.trim(); const pass=document.getElementById('i-pass').value;
-  if(!email||!pass){ S.msg={k:'err',t:'Saisis ton e-mail et ton mot de passe.'}; render(); return; }
+  const raw=document.getElementById('i-email').value.trim(); const pass=document.getElementById('i-pass').value;
+  if(!raw||!pass){ S.msg={k:'err',t:'Saisis ton pseudo et ton mot de passe.'}; render(); return; }
+  const email=loginToEmail(raw);
   const btn=document.getElementById('b-login'); btn.disabled=true; btn.innerHTML='<span class="spin"></span>';
   const { data, error } = await db.auth.signInWithPassword({ email, password:pass });
   if(error){ S.msg={k:'err',t:'Connexion impossible : '+error.message}; render(); return; }
