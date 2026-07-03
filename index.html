@@ -115,6 +115,23 @@ const lvlCls = l => l==='vert'?'g':(l==='orange'?'o':'r');
 const lvlWord = l => l==='vert'?'Au vert':(l==='orange'?'Vigilance':'À risque');
 const lvlBg = l => l==='vert'?'var(--green-bg)':(l==='orange'?'var(--amber-bg)':'var(--red-bg)');
 const lvlCol = l => l==='vert'?'var(--green)':(l==='orange'?'var(--amber)':'var(--red)');
+function daysSince(dstr){ if(!dstr) return 9999; try{ var a=new Date(dstr+'T00:00:00'); var b=new Date(today()+'T00:00:00'); return Math.round((b-a)/86400000); }catch(_){ return 9999; } }
+function athleteAlerts(x){
+  var al=[]; var lc=x&&x.lastCheckin; var dsc=lc?daysSince(lc.date):9999;
+  if(lc){
+    if(lc.pain) al.push({lvl:'r',icon:'ti-alert-triangle',t:'Douleur signalée'});
+    if(lc.fatigue!=null && lc.fatigue>=7) al.push({lvl:'o',icon:'ti-battery-1',t:'Fatigue élevée '+lc.fatigue+'/10'});
+    if(lc.sleep!=null && lc.sleep<=4) al.push({lvl:'o',icon:'ti-moon',t:'Sommeil bas '+lc.sleep+'/10'});
+    if(lc.motivation!=null && lc.motivation<=3) al.push({lvl:'o',icon:'ti-mood-sad',t:'Motivation basse '+lc.motivation+'/10'});
+  }
+  if(!lc) al.push({lvl:'o',icon:'ti-user-question',t:'Jamais de check-in'});
+  else if(dsc>=3) al.push({lvl:(dsc>=6?'r':'o'),icon:'ti-clock-x',t:'Absent depuis '+dsc+' j'});
+  if(x&&x.todayWorkout && x.todayWorkout!=='realisee') al.push({lvl:'i',icon:'ti-hourglass-low',t:'Séance du jour à faire'});
+  return al;
+}
+function alertRank(al){ if(al.some(function(a){return a.lvl==='r';})) return 3; if(al.some(function(a){return a.lvl==='o';})) return 2; if(al.length) return 1; return 0; }
+function alertColor(lvl){ return lvl==='r'?'var(--red)':(lvl==='o'?'var(--amber)':'var(--accent)'); }
+function alertBg(lvl){ return lvl==='r'?'var(--red-bg)':(lvl==='o'?'var(--amber-bg)':'var(--accent-soft)'); }
 function displayName(){ if(S.profile && S.profile.first_name) return S.profile.first_name; if(S.user && S.user.email) return S.user.email.split('@')[0]; return 'athlète'; }
 function esc(s){ return (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
@@ -145,7 +162,14 @@ async function loadAll(){
   try{ await db.from('leaderboard_points').upsert({athlete_id:uid, first_name:(prof&&prof.first_name)||'Athlète', points:computePoints(), updated_at:new Date().toISOString()}, {onConflict:'athlete_id'}); }catch(_){}
   try{ const tr=await db.from('fitness_tests').select('*').eq('athlete_id',uid).order('date',{ascending:false}).limit(100); S.tests=tr.data||[]; }catch(_){ S.tests=[]; }
   S.athletes=[];
-  if(S.profile && S.profile.role==='admin'){ try{ const ar = await db.from('profiles').select('id,first_name,last_name,main_goal').neq('id',uid).order('first_name',{ascending:true}); const sr = await db.from('fitness_scores').select('athlete_id,level,score,date').order('date',{ascending:false}).limit(500); const latest={}; (sr.data||[]).forEach(function(r){ if(!latest[r.athlete_id]) latest[r.athlete_id]=r; }); S.athletes=(ar.data||[]).map(function(a){ a.score=latest[a.id]||null; return a; }); }catch(_){ S.athletes=[]; } }
+  if(S.profile && S.profile.role==='admin'){ try{ const ar = await db.from('profiles').select('id,first_name,last_name,main_goal').neq('id',uid).order('first_name',{ascending:true}); const sr = await db.from('fitness_scores').select('athlete_id,level,score,date').order('date',{ascending:false}).limit(500); const latest={}; (sr.data||[]).forEach(function(r){ if(!latest[r.athlete_id]) latest[r.athlete_id]=r; }); S.athletes=(ar.data||[]).map(function(a){ a.score=latest[a.id]||null; return a; }); }catch(_){ S.athletes=[]; }
+    try{ var aids=S.athletes.map(function(a){return a.id;}); if(aids.length){
+      var ck=await db.from('daily_checkins').select('athlete_id,date,fatigue,sleep,pain,motivation,stress').in('athlete_id',aids).order('date',{ascending:false}).limit(2000);
+      var lcm={}; (ck.data||[]).forEach(function(r){ if(!lcm[r.athlete_id]) lcm[r.athlete_id]=r; });
+      var twm={}; try{ var tw=await db.from('workouts').select('athlete_id,status').eq('date',today()).in('athlete_id',aids); (tw.data||[]).forEach(function(r){ if(!twm[r.athlete_id]) twm[r.athlete_id]=r.status||'prevue'; }); }catch(_){}
+      S.athletes.forEach(function(a){ a.lastCheckin=lcm[a.id]||null; a.todayWorkout=twm[a.id]||null; });
+    } }catch(_){}
+  }
 }
 async function saveCheckin(c){
   const uid = S.user.id; const d = today();
@@ -362,15 +386,39 @@ async function openWorkout(id){
 }
 function scrCoach(){
   var a=S.athletes||[];
-  var tb='<div class="tbar"><button class="ic" onclick="go(\'dash\')"><i class="ti ti-chevron-left"></i></button><h2 style="font-size:19px">Mes athlètes</h2><span style="width:38px"></span></div>';
+  var tb='<div class="tbar"><button class="ic" onclick="go(\'dash\')"><i class="ti ti-chevron-left"></i></button><h2 style="font-size:19px">Tableau de bord</h2><span style="width:38px"></span></div>';
   var msg=S.msg?'<div class="msg '+S.msg.k+'">'+S.msg.t+'</div>':'';
   var createBtn='<button class="btn" onclick="go(\'newathlete\')" style="margin-bottom:13px"><i class="ti ti-user-plus"></i> Créer un compte athlète</button>';
+  var grpBtn='<button class="btn outline" onclick="go(\'groupsession\')" style="margin-bottom:13px"><i class="ti ti-users-group"></i> Séance de groupe (synchronisée)</button>';
   function lv(x){ return x&&x.score?x.score.level:null; }
-  if(!a.length) return tb+msg+createBtn+'<div class="card flat" style="text-align:center;padding:26px 16px"><i class="ti ti-users" style="font-size:34px;color:var(--faint)"></i><div style="font-weight:700;margin:10px 0 4px">Aucun athlète</div><div class="sub">Crée le compte d\'un athlète avec le bouton ci-dessus : il apparaîtra ici avec son score de forme.</div></div>';
+  if(!a.length) return tb+msg+createBtn+'<div class="card flat" style="text-align:center;padding:26px 16px"><i class="ti ti-users" style="font-size:34px;color:var(--faint)"></i><div style="font-weight:700;margin:10px 0 4px">Aucun athlète</div><div class="sub">Crée le compte d\'un athlète avec le bouton ci-dessus : il apparaîtra ici avec son suivi.</div></div>';
   var g=a.filter(function(x){return lv(x)==='vert';}).length,o=a.filter(function(x){return lv(x)==='orange';}).length,r=a.filter(function(x){return lv(x)==='rouge';}).length;
   var counts='<div class="row" style="gap:8px;margin-bottom:12px"><div class="card flat" style="flex:1;margin:0;text-align:center;padding:11px"><div class="big" style="font-size:21px;color:var(--green)">'+g+'</div><div class="label">Au vert</div></div><div class="card flat" style="flex:1;margin:0;text-align:center;padding:11px"><div class="big" style="font-size:21px;color:var(--amber)">'+o+'</div><div class="label">Vigilance</div></div><div class="card flat" style="flex:1;margin:0;text-align:center;padding:11px"><div class="big" style="font-size:21px;color:var(--red)">'+r+'</div><div class="label">À risque</div></div></div>';
-  var rows=a.map(function(x){ var l=lv(x); var dot=l?'<span class="dot '+(l==='vert'?'g':(l==='orange'?'o':'r'))+'"></span>':'<span class="sub" style="font-size:11px">—</span>'; var init=((x.first_name||'?').charAt(0)||'?').toUpperCase(); return '<div class="ath" onclick="openAthlete(\''+x.id+'\')" style="cursor:pointer"><div class="av">'+esc(init)+'</div><div class="m"><div class="nm">'+esc(((x.first_name||'')+' '+(x.last_name||'')).trim()||'Athlète')+'</div><div class="ds">'+esc(x.main_goal||'Objectif non défini')+'</div></div>'+dot+'</div>'; }).join('');
-  return tb+msg+createBtn+'<button class="btn outline" onclick="go(\'groupsession\')" style="margin-bottom:13px"><i class="ti ti-users-group"></i> Séance de groupe (synchronisée)</button>'+counts+'<div class="card" style="padding:4px 14px">'+rows+'</div>';
+  var withAl=a.map(function(x){ return {x:x, al:athleteAlerts(x)}; }).filter(function(o){ return o.al.length; });
+  withAl.sort(function(p,q){ return alertRank(q.al)-alertRank(p.al); });
+  var alertSec;
+  if(withAl.length){
+    var arows=withAl.map(function(o){
+      var x=o.x; var nm=esc(((x.first_name||'')+' '+(x.last_name||'')).trim()||'Athlète');
+      var init=((x.first_name||'?').charAt(0)||'?').toUpperCase();
+      var chips=o.al.map(function(al){ return '<span style="display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:600;color:'+alertColor(al.lvl)+';background:'+alertBg(al.lvl)+';padding:2px 8px;border-radius:20px;margin:3px 4px 0 0"><i class="ti '+al.icon+'"></i>'+esc(al.t)+'</span>'; }).join('');
+      var rk=alertRank(o.al); var topLvl=rk===3?'r':(rk===2?'o':'i');
+      return '<div onclick="openAthlete(\''+x.id+'\')" style="cursor:pointer;padding:11px 0;border-bottom:1px solid var(--line)"><div style="display:flex;align-items:center;gap:11px"><div class="av" style="background:'+alertBg(topLvl)+';color:'+alertColor(topLvl)+'">'+esc(init)+'</div><div style="flex:1;min-width:0"><div class="nm" style="font-size:14px;font-weight:600">'+nm+'</div><div>'+chips+'</div></div><i class="ti ti-chevron-right" style="color:var(--faint);flex:0 0 auto"></i></div></div>';
+    }).join('');
+    alertSec='<div class="label" style="margin:4px 0 7px;display:flex;align-items:center;gap:6px"><i class="ti ti-bell-ringing" style="color:var(--amber)"></i> À SUIVRE AUJOURD\'HUI ('+withAl.length+')</div><div class="card" style="padding:0 14px 6px">'+arows+'</div>';
+  } else {
+    alertSec='<div class="banner" style="background:var(--green-bg);margin-bottom:12px"><i class="ti ti-circle-check" style="color:var(--green)"></i><div class="x" style="color:var(--green)">Rien à signaler — aucune alerte chez tes athlètes aujourd\'hui.</div></div>';
+  }
+  var rows=a.map(function(x){
+    var l=lv(x); var dot=l?'<span class="dot '+(l==='vert'?'g':(l==='orange'?'o':'r'))+'"></span>':'<span class="sub" style="font-size:11px">—</span>';
+    var init=((x.first_name||'?').charAt(0)||'?').toUpperCase();
+    var lc=x.lastCheckin; var sub;
+    if(lc){ var dsc=daysSince(lc.date); sub='Check-in '+(dsc<=0?'aujourd\'hui':(dsc===1?'hier':'il y a '+dsc+' j'))+' · fatigue '+(lc.fatigue!=null?lc.fatigue+'/10':'—'); }
+    else sub='Aucun check-in';
+    var nAl=athleteAlerts(x).length; var badge=nAl?'<span style="font-size:10px;font-weight:700;color:var(--red);background:var(--red-bg);padding:1px 6px;border-radius:20px;margin-right:6px">'+nAl+'</span>':'';
+    return '<div class="ath" onclick="openAthlete(\''+x.id+'\')" style="cursor:pointer"><div class="av">'+esc(init)+'</div><div class="m"><div class="nm">'+esc(((x.first_name||'')+' '+(x.last_name||'')).trim()||'Athlète')+'</div><div class="ds">'+esc(sub)+'</div></div>'+badge+dot+'</div>';
+  }).join('');
+  return tb+msg+createBtn+grpBtn+counts+alertSec+'<div class="label" style="margin:4px 0 7px">TOUS LES ATHLÈTES ('+a.length+')</div><div class="card" style="padding:4px 14px">'+rows+'</div>';
 }
 function scrGroupSession(){
   var tb='<div class="tbar"><button class="ic" onclick="go(\'coach\')"><i class="ti ti-chevron-left"></i></button><h2 style="font-size:19px">Séance de groupe</h2><span style="width:38px"></span></div>';
@@ -419,12 +467,16 @@ function scrCoachDetail(){
   var msg=S.msg?'<div class="msg '+S.msg.k+'">'+S.msg.t+'</div>':'';
   var ap=S.selAthleteProfile||{};
   var info='<div class="card"><div class="label" style="margin-bottom:6px">Objectif & profil</div><div class="sub" style="color:var(--ink)"><b>Objectif :</b> '+esc(ap.main_goal||'non défini')+'<br><b>Niveau :</b> '+esc(ap.sport_level||'non défini')+'<br><b>Matériel :</b> '+esc(ap.available_equipment||'non défini')+'</div></div>';
+  var lcd=x.lastCheckin; var ald=athleteAlerts(x);
+  var chipsD=ald.length?ald.map(function(z){ return '<span style="display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:600;color:'+alertColor(z.lvl)+';background:'+alertBg(z.lvl)+';padding:2px 8px;border-radius:20px;margin:0 4px 4px 0"><i class="ti '+z.icon+'"></i>'+esc(z.t)+'</span>'; }).join(''):'<span class="pill g">Aucune alerte</span>';
+  var ciTxt=lcd?('Sommeil '+(lcd.sleep!=null?lcd.sleep+'/10':'—')+' · Fatigue '+(lcd.fatigue!=null?lcd.fatigue+'/10':'—')+' · Motivation '+(lcd.motivation!=null?lcd.motivation+'/10':'—')+(lcd.pain?' · douleur signalée':'')+' — '+(daysSince(lcd.date)<=0?'aujourd\'hui':(daysSince(lcd.date)===1?'hier':'il y a '+daysSince(lcd.date)+' j'))):'Aucun check-in enregistré pour l\'instant.';
+  var etat='<div class="card"><div class="label" style="margin-bottom:7px">État du jour</div><div style="margin-bottom:8px">'+chipsD+'</div><div class="sub" style="color:var(--ink)">'+esc(ciTxt)+'</div></div>';
   var busy=S.coachBusy?'<div class="banner" style="background:var(--accent-soft)"><div class="spin" style="border-color:var(--accent);border-top-color:transparent"></div><div class="x" style="color:#1742a5">Génération en cours… quelques secondes.</div></div>':'';
   var actions='<button class="btn" onclick="doGenForAthlete(\'workout\')"'+(S.coachBusy?' disabled':'')+'><i class="ti ti-sparkles"></i> Générer sa séance du jour</button>'+
     '<button class="btn ghost" style="margin-top:9px" onclick="doGenForAthlete(\'nutrition\')"'+(S.coachBusy?' disabled':'')+'><i class="ti ti-salad"></i> Générer sa nutrition</button>'+
     '<button class="btn outline" style="margin-top:9px" onclick="go(\'athleteEdit\')"><i class="ti ti-edit"></i> Modifier son profil / objectif</button>'+
     '<button class="btn outline" style="margin-top:9px;color:var(--red);border-color:var(--red)" onclick="doDeleteAthlete()"><i class="ti ti-trash"></i> Supprimer ce compte</button>';
-  return tb+msg+head+info+wt+busy+actions;
+  return tb+msg+head+etat+info+wt+busy+actions;
 }
 async function doGenForAthlete(kind){
   if(!S.selAthlete){ return; }
