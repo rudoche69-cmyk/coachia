@@ -213,6 +213,7 @@ function scrDash(){
   }
   let goalHint = '';
   if(!p.main_goal){ goalHint = '<div class="banner" style="background:var(--amber-bg)"><i class="ti ti-target" style="color:var(--amber)"></i><div class="x" style="color:#7a4a12">Renseigne ton <b>objectif</b> pour des séances vraiment sur-mesure. <b style="cursor:pointer;text-decoration:underline" onclick="go(\'profile\')">Compléter mon profil →</b></div></div>'; }
+  goalHint += goalCard(true);
   const wk = S.workout;
   let seance;
   if(wk){
@@ -453,7 +454,7 @@ async function doGroupSession(){
   S.msg={k: ok?'ok':'err', t: ok?('Séance diffusée à '+ok+' athlète(s) ✅ — chacun peut maintenant saisir ses charges.'):'Diffusion impossible. As-tu lancé la commande SQL des droits de groupe ?'}; render();
 }
 async function openAthlete(id){
-  S.selAthlete=null; S.selAthleteProfile=null;
+  S.selAthlete=null; S.selAthleteProfile=null; S.goalFor=null;
   for(var i=0;i<S.athletes.length;i++){ if(S.athletes[i].id===id){ S.selAthlete=S.athletes[i]; break; } }
   try{ var pr=await db.from('profiles').select('*').eq('id',id).maybeSingle(); S.selAthleteProfile=pr.data||null; }catch(_){ S.selAthleteProfile=null; }
   try{ var wr=await db.from('daily_checkins').select('date,weight').eq('athlete_id',id).not('weight','is',null).order('date',{ascending:true}).limit(30); S.selWeights=wr.data||[]; }catch(_){ S.selWeights=[]; }
@@ -500,8 +501,10 @@ function scrCoachDetail(){
   var actions='<button class="btn" onclick="doGenForAthlete(\'workout\')"'+(S.coachBusy?' disabled':'')+'><i class="ti ti-sparkles"></i> Générer sa séance du jour</button>'+
     '<button class="btn ghost" style="margin-top:9px" onclick="doGenForAthlete(\'nutrition\')"'+(S.coachBusy?' disabled':'')+'><i class="ti ti-salad"></i> Générer sa nutrition</button>'+
     '<button class="btn outline" style="margin-top:9px" onclick="go(\'athleteEdit\')"><i class="ti ti-edit"></i> Modifier son profil / objectif</button>'+
+    '<button class="btn outline" style="margin-top:9px" onclick="openAthleteGoal()"><i class="ti ti-target"></i> Objectif chiffré (cible + date)</button>'+
     '<button class="btn outline" style="margin-top:9px;color:var(--red);border-color:var(--red)" onclick="doDeleteAthlete()"><i class="ti ti-trash"></i> Supprimer ce compte</button>';
-  return tb+msg+head+etat+stats+chargesCard+testsCard+info+wt+busy+actions;
+  var goalC=goalCard(false);
+  return tb+msg+head+etat+goalC+stats+chargesCard+testsCard+info+wt+busy+actions;
 }
 async function doGenForAthlete(kind){
   if(!S.selAthlete){ return; }
@@ -1398,6 +1401,101 @@ function scrOnboarding(){
 function onbNext(){ S.onb=(S.onb||0)+1; if(S.onb>=ONB_STEPS.length){ onbSkip(); return; } render(); }
 function onbSkip(){ try{ localStorage.setItem('coachia_onb','1'); }catch(_){} S.onb=0; S.screen='dash'; render(); }
 function needsOnboarding(){ try{ return !!(S.profile && S.profile.role!=='admin' && !localStorage.getItem('coachia_onb')); }catch(_){ return false; } }
+function goalUnitDefault(t){ return t==='poids'?'kg':(t==='charge'?'kg':(t==='chrono'?'min':(t==='distance'?'km':(t==='reps'?'reps':'')))); }
+function goalTypeLabel(t){ return t==='poids'?'Objectif poids':(t==='charge'?'Objectif force':(t==='chrono'?'Objectif chrono':(t==='distance'?'Objectif distance':(t==='reps'?'Objectif répétitions':'Mon objectif')))); }
+function goalCurrent(gd, self){
+  if(!gd) return null;
+  var weights = self?(S.weights||[]):(S.selWeights||[]);
+  var lifts = self?(S.lifts||[]):(S.selLifts||[]);
+  var tests = self?(S.tests||[]):(S.selTests||[]);
+  if(gd.type==='poids'){ var lw=weights.length?Number(weights[weights.length-1].weight):null; if(self && S.todayCheckin && S.todayCheckin.weight!=null) lw=Number(S.todayCheckin.weight); return lw; }
+  if(gd.type==='charge'){ var lbl=(gd.label||'').toLowerCase().trim(); var best=null; lifts.forEach(function(l){ if(!lbl || (l.name||'').toLowerCase().indexOf(lbl)>=0){ if(best==null||l.load>best) best=l.load; } }); if(best==null){ for(var i=0;i<tests.length;i++){ if(tests[i].type==='force'){ best=Number(tests[i].value); break; } } } return best!=null?best:(gd.current!=null?Number(gd.current):null); }
+  return gd.current!=null?Number(gd.current):null;
+}
+function goalProgress(gd, self){
+  var cur=goalCurrent(gd, self);
+  var start=(gd&&gd.start!=null&&gd.start!=='')?Number(gd.start):null;
+  var target=(gd&&gd.target!=null&&gd.target!=='')?Number(gd.target):null;
+  if(cur==null||start==null||target==null||start===target) return {cur:cur, pct:null};
+  var pct=(cur-start)/(target-start); pct=Math.max(0,Math.min(1,pct));
+  return {cur:cur, pct:Math.round(pct*100)};
+}
+function goalDaysLeft(gd){ if(!gd||!gd.deadline) return null; return -daysSince(gd.deadline); }
+function goalMsg(pct){ if(pct==null) return 'Renseigne ta valeur actuelle pour suivre ta progression.'; if(pct>=100) return 'Objectif atteint ! Bravo 🎉'; if(pct>=75) return 'Presque là, tiens bon 💪'; if(pct>=40) return 'Belle progression, continue !'; if(pct>=15) return 'C\'est lancé, garde le rythme.'; return 'Chaque séance compte. On y va !'; }
+function goalPrompt(){ return '<div class="card" onclick="openMyGoal()" style="cursor:pointer;border:1px dashed var(--accent)"><div style="display:flex;align-items:center;gap:10px"><i class="ti ti-target" style="color:var(--accent);font-size:20px"></i><div style="flex:1"><div style="font-weight:700">Définir mon objectif</div><div class="sub">Fixe une cible chiffrée et une date, et suis ta progression.</div></div><i class="ti ti-chevron-right" style="color:var(--faint)"></i></div></div>'; }
+function goalCard(self){
+  var p = self?(S.profile||{}):(S.selAthleteProfile||{});
+  var gd = p.goal_detail;
+  if(!gd || gd.target==null || gd.target===''){ return self?goalPrompt():''; }
+  var pr=goalProgress(gd, self); var pct=pr.pct; var cur=pr.cur; var unit=gd.unit||'';
+  var title = gd.type==='charge'?(esc(gd.label||'Charge')+' — force'):goalTypeLabel(gd.type);
+  var cd=''; var dl=goalDaysLeft(gd);
+  if(dl!=null){ if(dl>0) cd='<span class="pill o">J-'+dl+'</span>'; else if(dl===0) cd='<span class="pill r">Jour J !</span>'; else cd='<span class="pill r">Échéance passée</span>'; }
+  var editBtn = self?'<i class="ti ti-pencil" style="color:var(--faint);cursor:pointer" onclick="openMyGoal()"></i>':'';
+  var bar = pct!=null?'<div style="height:10px;background:var(--line);border-radius:20px;overflow:hidden;margin:10px 0 6px"><div style="height:100%;width:'+pct+'%;background:var(--accent);border-radius:20px;transition:width .4s"></div></div>':'';
+  var vals = pct!=null?'<div class="sub"><b style="color:var(--ink)">'+cur+' '+esc(unit)+'</b> → cible '+esc(gd.target)+' '+esc(unit)+' · <b style="color:var(--accent)">'+pct+'%</b></div>':'<div class="sub">Cible : '+esc(gd.target)+' '+esc(unit)+(gd.current!=null?' · actuel '+esc(gd.current)+' '+esc(unit):'')+'</div>';
+  var mrows='';
+  if(gd.milestones && gd.milestones.length){
+    mrows=gd.milestones.map(function(m,i){ return '<label style="display:flex;align-items:center;gap:8px;padding:5px 0;cursor:'+(self?'pointer':'default')+'"><input type="checkbox" '+(m.done?'checked':'')+' '+(self?'onclick="toggleMilestone('+i+')"':'disabled')+' style="width:18px;height:18px;accent-color:var(--accent);flex:0 0 auto"><span style="font-size:13px;'+(m.done?'text-decoration:line-through;color:var(--faint)':'color:var(--ink)')+'">'+esc(m.t)+'</span></label>'; }).join('');
+    mrows='<div style="margin-top:8px;border-top:1px solid var(--line);padding-top:6px"><div class="label" style="margin-bottom:2px">Étapes</div>'+mrows+'</div>';
+  }
+  return '<div class="card" style="border:1px solid var(--accent)"><div class="row" style="align-items:center;margin-bottom:2px"><div class="label" style="color:var(--accent)"><i class="ti ti-target" style="vertical-align:-2px"></i> '+esc(title)+'</div><div style="display:flex;align-items:center;gap:8px">'+cd+editBtn+'</div></div>'+bar+vals+'<div class="sub" style="margin-top:7px;font-style:italic;color:var(--muted)">'+goalMsg(pct)+'</div>'+mrows+'</div>';
+}
+function scrGoal(){
+  var self=!S.goalFor;
+  var p=self?(S.profile||{}):(S.selAthleteProfile||{});
+  var gd=p.goal_detail||{};
+  var who=self?'Mon objectif':'Objectif de '+esc(p.first_name||'l\'athlète');
+  var back=self?'dash':'coachDetail';
+  var types=[['poids','Poids (kg)'],['charge','Charge sur un exercice (kg)'],['chrono','Chrono course (min)'],['distance','Distance (km ou m)'],['reps','Répétitions'],['perso','Autre (personnalisé)']];
+  var m=gd.milestones||[];
+  var tb='<div class="tbar"><button class="ic" onclick="go(\''+back+'\')"><i class="ti ti-chevron-left"></i></button><h2 style="font-size:19px">'+who+'</h2><span style="width:38px"></span></div>';
+  var msg=S.msg?'<div class="msg '+S.msg.k+'">'+S.msg.t+'</div>':'';
+  var info='<div class="banner" style="background:var(--accent-soft)"><i class="ti ti-target" style="color:var(--accent)"></i><div class="x" style="color:#1742a5">Fixe une <b>cible chiffrée</b> et une <b>date</b>. Pour le poids et la force, la progression se calcule toute seule (check-ins et charges). Pour les autres, mets à jour la « valeur actuelle ».</div></div>';
+  return tb+msg+info+
+    selField('g-type','Type d\'objectif',gd.type,types)+
+    inField('g-label','Exercice concerné (si charge)',gd.label,'text','ex : Squat, Développé couché')+
+    inField('g-unit','Unité',gd.unit,'text','kg, min, km, reps…')+
+    inField('g-start','Valeur de départ',gd.start,'number','ex : 82')+
+    inField('g-target','Valeur cible',gd.target,'number','ex : 75')+
+    inField('g-current','Valeur actuelle (si non auto)',gd.current,'number','pour chrono / distance / perso')+
+    inField('g-deadline','Date cible',gd.deadline,'date','')+
+    '<div class="label" style="margin:6px 2px 6px">Étapes (facultatif)</div>'+
+    inField('g-m1','Étape 1',m[0]?m[0].t:'','text','ex : tenir 20 min de course')+
+    inField('g-m2','Étape 2',m[1]?m[1].t:'','text','')+
+    inField('g-m3','Étape 3',m[2]?m[2].t:'','text','')+
+    '<button class="btn" id="b-goal" onclick="doSaveGoal()"><i class="ti ti-check"></i> Enregistrer l\'objectif</button>'+
+    (gd.target!=null&&gd.target!==''?'<button class="btn outline" style="margin-top:9px;color:var(--red);border-color:var(--red)" onclick="doClearGoal()"><i class="ti ti-trash"></i> Supprimer l\'objectif</button>':'');
+}
+function openMyGoal(){ S.goalFor=null; S.screen='goal'; render(); }
+function openAthleteGoal(){ if(!S.selAthlete) return; S.goalFor=S.selAthlete.id; S.screen='goal'; render(); }
+async function doSaveGoal(){
+  var self=!S.goalFor; var id=self?S.user.id:S.goalFor;
+  var g=function(x){var e=document.getElementById(x);return e?e.value.trim():'';};
+  var target=g('g-target'); if(target===''||isNaN(parseFloat(target))){ S.msg={k:'err',t:'Indique au moins une valeur cible (un nombre).'}; render(); return; }
+  var type=g('g-type')||'perso';
+  var oldP=self?(S.profile||{}):(S.selAthleteProfile||{}); var oldM=(oldP.goal_detail&&oldP.goal_detail.milestones)||[];
+  var ms=[]; ['g-m1','g-m2','g-m3'].forEach(function(x,i){ var t=g(x); if(t){ var done=(oldM[i]&&oldM[i].t===t)?!!oldM[i].done:false; ms.push({t:t,done:done}); } });
+  var gd={ type:type, label:g('g-label')||null, unit:g('g-unit')||goalUnitDefault(type), start:(g('g-start')!==''?parseFloat(g('g-start')):null), target:parseFloat(target), current:(g('g-current')!==''?parseFloat(g('g-current')):null), deadline:g('g-deadline')||null, milestones:ms };
+  var btn=document.getElementById('b-goal'); if(btn){ btn.disabled=true; btn.innerHTML='<span class="spin"></span>'; }
+  try{
+    var r=await db.from('profiles').update({goal_detail:gd}).eq('id',id);
+    if(r.error){ S.msg={k:'err',t:'Erreur : '+r.error.message+' (la colonne goal_detail est-elle créée ?)'}; render(); return; }
+    if(self){ if(S.profile)S.profile.goal_detail=gd; S.goalFor=null; S.msg={k:'ok',t:'Objectif enregistré ! Suis ta progression sur l\'accueil.'}; S.screen='dash'; }
+    else { if(S.selAthleteProfile)S.selAthleteProfile.goal_detail=gd; S.goalFor=null; S.msg={k:'ok',t:'Objectif de l\'athlète enregistré.'}; S.screen='coachDetail'; }
+    render();
+  }catch(e){ S.msg={k:'err',t:'Erreur : '+(e.message||e)}; render(); }
+}
+async function doClearGoal(){
+  var self=!S.goalFor; var id=self?S.user.id:S.goalFor;
+  if(!confirm('Supprimer cet objectif ?')) return;
+  try{
+    await db.from('profiles').update({goal_detail:null}).eq('id',id);
+    if(self){ if(S.profile)S.profile.goal_detail=null; S.goalFor=null; S.screen='dash'; } else { if(S.selAthleteProfile)S.selAthleteProfile.goal_detail=null; S.goalFor=null; S.screen='coachDetail'; }
+    S.msg={k:'ok',t:'Objectif supprimé.'}; render();
+  }catch(e){ S.msg={k:'err',t:'Erreur : '+(e.message||e)}; render(); }
+}
+async function toggleMilestone(i){ var gd=S.profile&&S.profile.goal_detail; if(!gd||!gd.milestones||!gd.milestones[i])return; gd.milestones[i].done=!gd.milestones[i].done; try{ await db.from('profiles').update({goal_detail:gd}).eq('id',S.user.id); }catch(_){} render(); }
 function navBar(){
   const b=(ic,t)=>'<button class="'+(S.screen===t?'on':'')+'" onclick="go(\''+t+'\')" style="font-size:11px;font-weight:700;color:inherit;letter-spacing:.02em">'+ic+'</button>';
   var ckDot=(S.user && !S.todayCheckin)?'<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--red);margin-left:4px;vertical-align:middle"></span>':'';
@@ -1410,7 +1508,7 @@ function render(extra){
   else if(S.screen==='onboarding'){ html=scrOnboarding(); nav.style.display='none'; }
   else if(S.screen==='result'){ html=scrResult(extra); nav.style.display='flex'; nav.innerHTML=navBar(); }
   else { nav.style.display='flex'; nav.innerHTML=navBar();
-    html = S.screen==='checkin'?scrCheckin():(S.screen==='workout'?scrWorkout():(S.screen==='profile'?scrProfile():(S.screen==='genopts'?scrGenOptions():(S.screen==='charges'?scrCharges():(S.screen==='calendar'?scrCalendar():(S.screen==='coach'?scrCoach():(S.screen==='coachDetail'?scrCoachDetail():(S.screen==='nutrition'?scrNutrition():(S.screen==='runs'?scrRuns():(S.screen==='badges'?scrBadges():(S.screen==='feedback'?scrFeedback():(S.screen==='comps'?scrComps():(S.screen==='assistant'?scrAssistant():(S.screen==='report'?scrReport():(S.screen==='runplanopts'?scrRunPlanOpts():(S.screen==='runsession'?scrRunSession():(S.screen==='newathlete'?scrNewAthlete():(S.screen==='athleteEdit'?scrAthleteEdit():(S.screen==='muscu'?scrMuscu():(S.screen==='muscuopts'?scrMuscuOpts():(S.screen==='muscuday'?scrMuscuDay():(S.screen==='exodetail'?scrExoDetail():(S.screen==='leaderboard'?scrLeaderboard():(S.screen==='groupsession'?scrGroupSession():(S.screen==='programopts'?scrProgramOpts():(S.screen==='tests'?scrTests():scrDash()))))))))))))))))))))))))));
+    html = S.screen==='checkin'?scrCheckin():(S.screen==='workout'?scrWorkout():(S.screen==='profile'?scrProfile():(S.screen==='genopts'?scrGenOptions():(S.screen==='charges'?scrCharges():(S.screen==='calendar'?scrCalendar():(S.screen==='coach'?scrCoach():(S.screen==='coachDetail'?scrCoachDetail():(S.screen==='nutrition'?scrNutrition():(S.screen==='runs'?scrRuns():(S.screen==='badges'?scrBadges():(S.screen==='feedback'?scrFeedback():(S.screen==='comps'?scrComps():(S.screen==='assistant'?scrAssistant():(S.screen==='report'?scrReport():(S.screen==='runplanopts'?scrRunPlanOpts():(S.screen==='runsession'?scrRunSession():(S.screen==='newathlete'?scrNewAthlete():(S.screen==='athleteEdit'?scrAthleteEdit():(S.screen==='muscu'?scrMuscu():(S.screen==='muscuopts'?scrMuscuOpts():(S.screen==='muscuday'?scrMuscuDay():(S.screen==='exodetail'?scrExoDetail():(S.screen==='leaderboard'?scrLeaderboard():(S.screen==='groupsession'?scrGroupSession():(S.screen==='programopts'?scrProgramOpts():(S.screen==='tests'?scrTests():(S.screen==='goal'?scrGoal():scrDash())))))))))))))))))))))))))));
   }
   sc.innerHTML=html; sc.scrollTop=0; S.msg=null;
   const e=document.getElementById('i-email'); if(e) e.addEventListener('keydown',ev=>{if(ev.key==='Enter')document.getElementById('i-pass').focus();});
