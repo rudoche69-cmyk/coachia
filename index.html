@@ -90,7 +90,7 @@ const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 if ('serviceWorker' in navigator) { window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); }); }
 try{ var __th=localStorage.getItem('coachia-theme'); if(__th) document.documentElement.setAttribute('data-theme',__th); }catch(e){}
 
-const S = { screen:'login', user:null, profile:null, todayCheckin:null, todayScore:null, weights:[], lifts:[], chargeExo:null, history:[], athletes:[], selAthlete:null, selAthleteProfile:null, coachBusy:false, selWeights:[], nutrition:null, meals:[], genNut:false, foodLog:[], foodMode:'simple', runs:[], checkinCount:0, comps:[], chat:[], aiThinking:false, report:null, reportLoading:false, runPlan:null, selRun:null, muscu:null, selMuscuDay:null, selExo:null, selExoAlts:null, leaderboard:null, tests:[], calY:null, calM:null, calSel:null, workout:null, exercises:[], started:false, generating:false, msg:null };
+const S = { screen:'login', user:null, profile:null, todayCheckin:null, todayScore:null, weights:[], lifts:[], chargeExo:null, history:[], athletes:[], selAthlete:null, selAthleteProfile:null, coachBusy:false, selWeights:[], nutrition:null, meals:[], genNut:false, foodLog:[], foodMode:'simple', runs:[], checkinCount:0, comps:[], chat:[], aiThinking:false, report:null, reportLoading:false, runPlan:null, selRun:null, muscu:null, selMuscuDay:null, selExo:null, selExoAlts:null, exoCtx:'muscu', selExoDeload:false, leaderboard:null, tests:[], calY:null, calM:null, calSel:null, workout:null, exercises:[], started:false, generating:false, msg:null };
 function ymd(d){ return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2); }
 const today = () => ymd(new Date());
 /* Base d'aliments (valeurs pour 100 g) : [nom, kcal, protéines, glucides, lipides] */
@@ -215,7 +215,7 @@ function scrWorkout(){
   let meta = '<div class="row" style="gap:8px;margin-bottom:12px"><div class="card flat" style="flex:1;margin:0;text-align:center;padding:11px"><div class="label">Durée</div><div style="font-weight:700;margin-top:3px">'+(wk.estimated_duration||'—')+' min</div></div><div class="card flat" style="flex:1;margin:0;text-align:center;padding:11px"><div class="label">Type</div><div style="font-weight:700;margin-top:3px;font-size:13px">'+esc(wk.type||'—')+'</div></div><div class="card flat" style="flex:1;margin:0;text-align:center;padding:11px"><div class="label">État</div><div style="font-weight:700;margin-top:3px;font-size:13px">'+(done?'Terminée':(S.started?'En cours':'Prévue'))+'</div></div></div>';
   let list = '';
   if(wk.warmup) list += '<div class="ex"><div class="n"><i class="ti ti-flame"></i></div><div class="m"><div class="nm">Échauffement</div><div class="ds">'+esc(wk.warmup)+'</div></div></div>';
-  S.exercises.forEach((e,i)=>{ let v=''; if(e.sets||e.reps) v=(e.sets?e.sets+' × ':'')+esc(e.reps||''); if(e.load) v+=(v?'<br>':'')+esc(e.load); list += '<div class="ex"><div class="n">'+(i+1)+'</div><div class="m"><div class="nm">'+esc(e.name||'Exercice')+'</div><div class="ds">'+[e.rest?'repos '+esc(e.rest):'', e.rpe?'RPE '+e.rpe:'', esc(e.notes||'')].filter(Boolean).join(' · ')+'</div><div style="margin-top:7px;display:flex;align-items:center;gap:8px"><span style="font-size:10px;color:var(--faint);font-weight:700">CHARGE</span><input id="al-'+e.id+'" type="number" step="0.5" value="'+(e.actual_load!=null?e.actual_load:'')+'" placeholder="kg" style="width:80px;border:1px solid var(--line);border-radius:9px;padding:7px;font:inherit;font-size:13px;font-weight:700;text-align:center;background:var(--bg)"></div></div><div class="v">'+v+'</div></div>'; });
+  S.exercises.forEach((e,i)=>{ let v=''; if(e.sets||e.reps) v=(e.sets?e.sets+' × ':'')+esc(e.reps||''); if(e.load) v+=(v?'<br>':'')+esc(e.load); list += '<div class="ex"><div class="n">'+(i+1)+'</div><div class="m"><div class="nm">'+esc(e.name||'Exercice')+'</div><div class="ds">'+[e.rest?'repos '+esc(e.rest):'', e.rpe?'RPE '+e.rpe:'', esc(e.notes||'')].filter(Boolean).join(' · ')+'</div><span onclick="openExoW('+i+')" style="display:inline-block;margin-top:5px;font-size:11px;font-weight:700;color:var(--accent);cursor:pointer"><i class="ti ti-info-circle" style="vertical-align:-2px"></i> Technique / remplacer ›</span><div style="margin-top:7px;display:flex;align-items:center;gap:8px"><span style="font-size:10px;color:var(--faint);font-weight:700">CHARGE</span><input id="al-'+e.id+'" type="number" step="0.5" value="'+(e.actual_load!=null?e.actual_load:'')+'" placeholder="kg" style="width:80px;border:1px solid var(--line);border-radius:9px;padding:7px;font:inherit;font-size:13px;font-weight:700;text-align:center;background:var(--bg)"></div></div><div class="v">'+v+'</div></div>'; });
   if(wk.cooldown) list += '<div class="ex"><div class="n"><i class="ti ti-stretching"></i></div><div class="m"><div class="nm">Retour au calme</div><div class="ds">'+esc(wk.cooldown)+'</div></div></div>';
   let actions;
   if(done) actions = '<div class="banner" style="background:var(--green-bg)"><i class="ti ti-circle-check" style="color:var(--green)"></i><div class="x" style="color:var(--green)"><b>Séance terminée !</b> <span style="color:var(--ink)">Bien joué.</span></div></div><button class="btn outline" onclick="go(\'genopts\')"><i class="ti ti-refresh"></i> Régénérer une séance</button>';
@@ -1121,30 +1121,51 @@ function exoInfo(name){
   return {how:'Réalise le mouvement de façon contrôlée, sur toute l’amplitude, dos gainé. En cas de doute, regarde une vidéo de démonstration ci-dessous.', tip:'Commence léger pour bien maîtriser la technique avant de charger.'};
 }
 function openVideo(name){ try{ window.open('https://www.youtube.com/results?search_query='+encodeURIComponent((name||'')+' exercice technique'),'_blank'); }catch(e){} }
-function openExo(ei){ S.selExo=ei; S.screen='exodetail'; render(); }
+function grpFromExoName(n){ n=(n||'').toLowerCase();
+  if(/leg curl|squat|fente|soulev|presse|mollet|jambe|fessier|pont|chaise/.test(n)) return 'legs';
+  if(/pompe|développé couché|développé incliné|dips|pec/.test(n)) return 'push';
+  if(/militaire|épaule|élévation|pike/.test(n)) return 'push';
+  if(/traction|rowing|tirage|face pull|curl|dos|superman|oiseau/.test(n)) return 'pull';
+  return null;
+}
+function openExo(ei){ S.exoCtx='muscu'; S.selExo=ei; S.screen='exodetail'; render(); }
+function openExoW(ei){ S.exoCtx='workout'; S.selExo=ei; S.screen='exodetail'; render(); }
 function scrExoDetail(){
-  var idx=S.selMuscuDay; if(idx==null||!S.muscu) return scrMuscu();
-  var d=S.muscu.days[idx]; var ei=S.selExo; if(ei==null||!d.exercises[ei]) return scrMuscuDay();
-  var e=d.exercises[ei]; var info=exoInfo(e.name);
-  var tb='<div class="tbar"><button class="ic" onclick="go(\'muscuday\')"><i class="ti ti-chevron-left"></i></button><h2 style="font-size:18px">'+esc(e.name)+'</h2><span style="width:38px"></span></div>';
+  var ctx=S.exoCtx||'muscu'; var e, backScr, dEquip, dGrp, deload=false, usedArr;
+  if(ctx==='workout'){
+    e=(S.exercises||[])[S.selExo]; if(!e) return scrWorkout(); backScr='workout';
+    dEquip=(S.profile&&S.profile.available_equipment)||'Salle de sport (basique)'; dGrp=grpFromExoName(e.name); usedArr=(S.exercises||[]).map(function(x){return x.name;});
+  } else {
+    var idx=S.selMuscuDay; if(idx==null||!S.muscu) return scrMuscu(); var d=S.muscu.days[idx]; if(!d) return scrMuscu(); e=d.exercises[S.selExo]; if(!e) return scrMuscuDay();
+    backScr='muscuday'; dEquip=d.equip||(S.muscu&&S.muscu.equip)||'Salle de sport (basique)'; dGrp=d.grp||grpFromLabel(d.label); deload=!!d.deload; usedArr=d.exercises.map(function(x){return x.name;});
+  }
+  S.selExoDeload=deload;
+  var info=exoInfo(e.name);
+  var tb='<div class="tbar"><button class="ic" onclick="go(\''+backScr+'\')"><i class="ti ti-chevron-left"></i></button><h2 style="font-size:18px">'+esc(e.name)+'</h2><span style="width:38px"></span></div>';
   var msg=S.msg?'<div class="msg '+S.msg.k+'">'+S.msg.t+'</div>':'';
-  var meta='<div class="card"><div class="row"><span class="sub">Objectif du jour</span><span class="sub" style="font-weight:700;color:var(--ink)">'+e.sets+' séries × '+esc(e.reps)+'</span></div></div>';
+  var meta='<div class="card"><div class="row"><span class="sub">Objectif</span><span class="sub" style="font-weight:700;color:var(--ink)">'+(e.sets||'')+(e.sets?' × ':'')+esc(e.reps||'')+'</span></div></div>';
   var proto='<div class="card"><div class="label" style="margin-bottom:6px">Comment bien le réaliser</div><div class="sub" style="color:var(--ink);line-height:1.6">'+esc(info.how)+'</div><div class="banner" style="background:var(--amber-bg);margin-top:10px"><i class="ti ti-bulb" style="color:var(--amber)"></i><div class="x" style="color:#7a4a12">'+esc(info.tip)+'</div></div></div>';
   var video='<button class="btn" onclick="openVideo(\''+esc(e.name).replace(/[^A-Za-zÀ-ÿ0-9 ()\/-]/g,'')+'\')"><i class="ti ti-brand-youtube"></i> Voir une démo en vidéo</button>';
-  var tier=muscuEquipTier(d.equip||(S.muscu&&S.muscu.equip)||'Salle de sport (basique)');
-  var grp=d.grp||grpFromLabel(d.label);
-  var lib=muscuExo(grp,tier);
-  var used=d.exercises.map(function(x){return x.name;});
-  var alts=lib.filter(function(a){return used.indexOf(a[0])<0;});
-  S.selExoAlts=alts;
-  var altRows=alts.length?alts.map(function(a,ai){ return '<div class="ex"><div class="m"><div class="nm">'+esc(a[0])+'</div><div class="ds">'+a[1]+' × '+esc(a[2])+'</div></div><button class="btn outline" style="width:auto;margin-top:0;padding:8px 12px" onclick="doSwapExo('+ai+')">Choisir</button></div>'; }).join(''):'<div class="sub" style="padding:8px 0">Aucune autre option pour ce matériel.</div>';
-  return tb+msg+meta+proto+video+'<div class="label" style="margin:14px 2px 8px">Machine occupée / indisponible ? Remplace par :</div><div class="card" style="padding:6px 14px">'+altRows+'</div>';
+  var altsHtml;
+  if(dGrp){
+    var tier=muscuEquipTier(dEquip); var lib=muscuExo(dGrp,tier);
+    var alts=lib.filter(function(a){return usedArr.indexOf(a[0])<0;});
+    S.selExoAlts=alts;
+    altsHtml=alts.length?alts.map(function(a,ai){ return '<div class="ex"><div class="m"><div class="nm">'+esc(a[0])+'</div><div class="ds">'+a[1]+' × '+esc(a[2])+'</div></div><button class="btn outline" style="width:auto;margin-top:0;padding:8px 12px" onclick="doSwapExo('+ai+')">Choisir</button></div>'; }).join(''):'<div class="sub" style="padding:8px 0">Aucune autre option pour ce matériel.</div>';
+  } else { S.selExoAlts=[]; altsHtml='<div class="sub" style="padding:8px 0">Remplacement auto non dispo pour cet exercice spécifique (tu peux régénérer toute la séance).</div>'; }
+  return tb+msg+meta+proto+video+'<div class="label" style="margin:14px 2px 8px">Machine occupée / indisponible ? Remplace par :</div><div class="card" style="padding:6px 14px">'+altsHtml+'</div>';
 }
 async function doSwapExo(ai){
-  var idx=S.selMuscuDay; if(idx==null||!S.muscu) return; var d=S.muscu.days[idx]; var ei=S.selExo; var alt=(S.selExoAlts||[])[ai];
-  if(!alt||d.exercises[ei]==null) return;
-  var base=muscuLastLoad(alt[0]); var load=base?((d.deload?Math.round(base*0.9):base)+' kg'):'';
-  d.exercises[ei]={name:alt[0], sets:(d.deload?Math.max(2,alt[1]-1):alt[1]), reps:alt[2], load:load, rest:'2 min', done:false};
+  var alt=(S.selExoAlts||[])[ai]; if(!alt) return;
+  var deload=!!S.selExoDeload; var sets=deload?Math.max(2,alt[1]-1):alt[1];
+  var base=muscuLastLoad(alt[0]); var load=base?((deload?Math.round(base*0.9):base)+' kg'):'';
+  if((S.exoCtx||'muscu')==='workout'){
+    var ew=(S.exercises||[])[S.selExo]; if(!ew) return;
+    try{ await db.from('workout_exercises').update({name:alt[0],sets:alt[1],reps:String(alt[2]),load:load||null,actual_load:null}).eq('id',ew.id); await loadAll(); S.msg={k:'ok',t:'Exercice remplacé.'}; }catch(err){ S.msg={k:'err',t:'Erreur : '+(err.message||err)}; }
+    S.screen='workout'; render(); return;
+  }
+  var idx=S.selMuscuDay; if(idx==null||!S.muscu) return; var d=S.muscu.days[idx]; var ei=S.selExo; if(d.exercises[ei]==null) return;
+  d.exercises[ei]={name:alt[0], sets:sets, reps:alt[2], load:load, rest:'2 min', done:false};
   try{ await db.from('profiles').update({muscu_program:S.muscu}).eq('id',S.user.id); if(S.profile)S.profile.muscu_program=S.muscu; S.msg={k:'ok',t:'Exercice remplacé.'}; }catch(e){ S.msg={k:'err',t:'Erreur : '+(e.message||e)}; }
   S.screen='muscuday'; render();
 }
