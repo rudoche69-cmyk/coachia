@@ -202,6 +202,28 @@ function scrLogin(){
     '<div class="field"><label>Mot de passe</label><input id="i-pass" type="password" autocomplete="current-password" placeholder="••••••••"></div>'+
     '<button class="btn" id="b-login" onclick="doLogin()">Se connecter</button></div>';
 }
+function coachEntryCard(){ if(!(S.profile&&S.profile.role==='admin')) return ''; return '<div class="card" onclick="go(\'coach\')" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between"><div style="display:flex;align-items:center;gap:10px"><i class="ti ti-users" style="color:var(--accent);font-size:20px"></i><span style="font-weight:700">Espace coach</span></div><i class="ti ti-chevron-right" style="color:var(--faint)"></i></div>'; }
+function checkinBlock(){
+  var sc=S.todayScore;
+  if(sc){ var lvl=sc.level; return '<div class="card" onclick="go(\'checkin\')" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;padding:12px 15px"><div style="display:flex;align-items:center;gap:12px"><div class="ring" style="width:46px;height:46px;background:'+lvlBg(lvl)+'"><span style="font-size:16px;font-weight:800;color:'+lvlCol(lvl)+'">'+Number(sc.score).toFixed(1)+'</span></div><div><div class="label" style="margin:0">Forme du jour</div><div style="font-weight:700">'+lvlWord(lvl)+'</div></div></div><i class="ti ti-chevron-right" style="color:var(--faint)"></i></div>'; }
+  return '<div class="card" style="background:var(--accent-soft);border:none;display:flex;align-items:center;justify-content:space-between;gap:10px"><div style="flex:1"><div style="font-weight:700;color:#1742a5">Fais ton check-in du jour</div><div class="sub" style="color:#1742a5">Il calcule ta forme et adapte ta séance.</div></div><button class="btn" style="width:auto;margin:0;padding:11px 16px;flex:0 0 auto" onclick="go(\'checkin\')">C\'est parti</button></div>';
+}
+function heroCard(){
+  var ev=(calEvents()[today()]||[]).filter(function(e){return e.kind==='muscu'||e.kind==='run';});
+  if(ev.length) return todayPlanCard();
+  var wk=S.workout;
+  if(wk){ var done=wk.status==='realisee'; return '<div class="card" onclick="go(\'workout\')" style="cursor:pointer;background:var(--accent);border:none;padding:16px"><div style="color:#fff;opacity:.85;font-size:11px;font-weight:800;letter-spacing:.06em">SÉANCE DU JOUR</div><div style="color:#fff;font-weight:800;font-size:20px;margin:3px 0 2px">'+esc(wk.type||'Séance')+'</div><div style="color:#fff;opacity:.9;font-size:13px">'+esc(wk.objective||'')+(wk.estimated_duration?' · '+wk.estimated_duration+' min':'')+'</div><div style="margin-top:12px"><span style="display:inline-block;background:#fff;color:var(--accent);font-weight:800;padding:10px 18px;border-radius:12px">'+(done?'✓ Terminée — revoir':'Ouvrir la séance ›')+'</span></div></div>'; }
+  return '<div class="card" style="padding:16px"><div class="label" style="margin-bottom:6px">Séance du jour</div><div class="sub" style="margin-bottom:12px">Aucune séance pour aujourd\'hui. L\'IA en crée une adaptée à ta forme et à ton objectif.</div><button class="btn" onclick="go(\'genopts\')"><i class="ti ti-sparkles"></i> Générer ma séance</button></div>';
+}
+function toggleTools(){ S.showTools=!S.showTools; render(); }
+function toolsBlock(){
+  if(!S.showTools) return '';
+  var p=S.profile||{}; var w=S.weights||[]; var lastW=w.length?Number(w[w.length-1].weight).toFixed(1)+' kg':'—';
+  return goalsMiniCard()+
+    '<div class="card" style="display:flex;align-items:center;justify-content:space-between"><span class="label" style="margin:0">Poids actuel</span><span style="font-weight:700;color:var(--ink)">'+lastW+'</span></div>'+
+    '<div class="card" onclick="go(\'programopts\')" style="cursor:pointer;background:var(--accent);border:none"><div style="font-weight:700;font-size:15px;color:#fff"><i class="ti ti-wand"></i> Créer mon programme complet</div><div style="font-size:12px;color:#fff;opacity:.9;margin-top:3px">Muscu + course + objectif, sur un seul planning</div></div>'+
+    '<div class="label" style="margin:12px 2px 8px">Mes outils</div><div class="tiles">'+tile('ti-barbell','Programme muscu','muscu')+tile('ti-run','Sorties course','runs')+tile('ti-salad','Nutrition','nutrition')+tile('ti-calendar-event','Agenda','calendar')+tile('ti-chart-line','Charges','charges')+tile('ti-robot','Assistant IA','assistant')+tile('ti-file-text','Rapport','report')+tile('ti-trophy','Compétitions','comps')+tile('ti-clipboard-check','Mes tests','tests')+tile('ti-award','Records','records')+tile('ti-medal','Mes badges','badges')+(p.role==='admin'?tile('ti-crown','Classement','leaderboard'):'')+tile('ti-message-circle','Avis','feedback')+'</div>';
+}
 function scrDash(){
   const sc = S.todayScore; const hasScore = !!sc; const lvl = hasScore ? sc.level : null;
   const p = S.profile||{};
@@ -221,12 +243,7 @@ function scrDash(){
   }
   const w = S.weights; const lastW = w.length ? Number(w[w.length-1].weight).toFixed(1)+' kg' : '—';
   return '<div class="tbar"><div><div class="t">'+new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'})+'</div><h2>Bonjour, '+esc(displayName())+'</h2></div><button class="ic" onclick="go(\'profile\')" title="Mon profil"><i class="ti ti-user"></i></button></div>'+
-    topAlert()+compBanner()+(p.role==='admin'?'<div class="card" onclick="go(\'coach\')" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between"><div style="display:flex;align-items:center;gap:10px"><i class="ti ti-users" style="color:var(--accent);font-size:20px"></i><span style="font-weight:700">Espace coach</span></div><i class="ti ti-chevron-right" style="color:var(--faint)"></i></div>':'')+scoreCard+
-    (hasScore?'<button class="btn outline" onclick="go(\'checkin\')" style="margin-bottom:13px"><i class="ti ti-refresh"></i> Modifier mon check-in du jour</button>':'')+
-    todayPlanCard()+
-    seance+
-    goalHint+
-    '<div class="card" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:13px"><span class="label" style="margin:0">Poids actuel</span><span style="font-weight:700;color:var(--ink)">'+lastW+'</span></div>'+'<div class="card" onclick="go(\'programopts\')" style="cursor:pointer;background:var(--accent);border:none"><div style="font-weight:700;font-size:15px;color:#fff"><i class="ti ti-wand"></i> Créer mon programme complet</div><div style="font-size:12px;color:#fff;opacity:.9;margin-top:3px">Muscu + course + objectif, sur un seul planning</div></div>'+'<div class="label" style="margin:14px 2px 8px">Mes outils</div><div class="tiles">'+tile('ti-barbell','Programme muscu','muscu')+tile('ti-run','Sorties course','runs')+tile('ti-salad','Nutrition','nutrition')+tile('ti-calendar-event','Agenda','calendar')+tile('ti-chart-line','Charges','charges')+tile('ti-robot','Assistant IA','assistant')+tile('ti-file-text','Rapport','report')+tile('ti-trophy','Compétitions','comps')+tile('ti-clipboard-check','Mes tests','tests')+tile('ti-award','Records','records')+tile('ti-medal','Mes badges','badges')+tile('ti-crown','Classement','leaderboard')+tile('ti-message-circle','Avis','feedback')+'</div>';
+    topAlert()+coachEntryCard()+checkinBlock()+heroCard()+'<button class="btn outline" onclick="toggleTools()" style="margin-top:2px"><i class="ti '+(S.showTools?'ti-chevron-up':'ti-layout-grid')+'"></i> '+(S.showTools?'Masquer les outils':'Tous mes outils')+'</button>'+toolsBlock();
 }
 function scrWorkout(){
   if(S.generating){ return '<div class="tbar"><button class="ic" onclick="go(\'dash\')"><i class="ti ti-chevron-left"></i></button><h2 style="font-size:19px">Séance du jour</h2><span style="width:38px"></span></div><div class="center" style="min-height:380px"><div class="spin" style="border-color:var(--accent);border-top-color:transparent;width:30px;height:30px"></div><div>L\'IA génère ta séance…</div><div class="sub">Quelques secondes</div></div>'; }
