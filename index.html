@@ -1032,19 +1032,19 @@ function muscuExo(group,tier){
       full:[['Développé couché barre',4,'6-8'],['Développé incliné haltères',3,'8-10'],['Dips lestés',3,'8-12'],['Développé militaire',3,'8-10'],['Élévations latérales',3,'12-15'],['Extension triceps poulie',3,'10-12']],
       home:[['Développé couché haltères',4,'8-10'],['Développé incliné haltères',3,'8-10'],['Pompes',3,'max'],['Développé militaire haltères',3,'8-10'],['Élévations latérales',3,'12-15'],['Extension triceps haltère',3,'10-12']],
       mini:[['Pompes',4,'max'],['Développé couché élastique',3,'12-15'],['Élévations latérales élastique',3,'15'],['Dips entre 2 chaises',3,'max'],['Extension triceps élastique',3,'15']],
-      none:[['Pompes',4,'max'],['Pompes inclinées',3,'max'],['Pike push-ups (épaules)',3,'8-12'],['Dips sur chaise',3,'max'],['Pompes diamant (triceps)',3,'max']]
+      none:[['Pompes',4,'max'],['Pompes inclinées (mains surélevées)',3,'max'],['Pompes déclinées (pieds surélevés)',3,'max'],['Pike push-ups (épaules)',3,'8-12'],['Dips sur chaise',3,'max'],['Pompes diamant (triceps)',3,'max'],['Pompes larges (pectoraux)',3,'max'],['Pompes serrées',3,'max']]
     },
     pull:{
       full:[['Tractions',4,'6-10'],['Rowing barre',4,'8-10'],['Tirage vertical',3,'10-12'],['Rowing haltère',3,'10-12'],['Face pull',3,'15'],['Curl biceps barre',3,'10-12']],
       home:[['Rowing haltère',4,'8-10'],['Soulevé de terre roumain haltères',3,'8-10'],['Tractions (barre de porte)',3,'max'],['Oiseau (rear delt)',3,'15'],['Curl biceps haltères',3,'10-12'],['Curl marteau',3,'12']],
       mini:[['Tirage élastique',4,'12-15'],['Rowing élastique',4,'12-15'],['Face pull élastique',3,'15'],['Curl biceps élastique',3,'15'],['Curl kettlebell',3,'12']],
-      none:[['Tractions (si barre)',4,'max'],['Rowing australien (sous une table)',4,'max'],['Superman (lombaires)',3,'15'],['Curl sac lesté',3,'15'],['Tirage serviette isométrique',3,'20 s']]
+      none:[['Tractions (si barre)',4,'max'],['Rowing australien (sous une table)',4,'max'],['Superman (lombaires)',3,'15'],['Pont dorsal (bridge)',3,'12'],['Rowing serviette (contre porte)',3,'15'],['Curl sac lesté',3,'15'],['Tirage serviette isométrique',3,'20 s'],['Nageur (swimmers)',3,'20']]
     },
     legs:{
       full:[['Squat barre',4,'6-8'],['Presse à cuisses',3,'10-12'],['Fentes haltères',3,'10/jambe'],['Soulevé de terre roumain',3,'8-10'],['Extension mollets',4,'15'],['Leg curl',3,'12']],
       home:[['Squat gobelet',4,'8-10'],['Fentes haltères',3,'10/jambe'],['Soulevé de terre roumain haltères',3,'10'],['Squat bulgare',3,'10/jambe'],['Mollets debout',4,'15'],['Pont fessier lesté',3,'12']],
       mini:[['Squat élastique',4,'15'],['Fentes',3,'12/jambe'],['Soulevé de terre élastique',3,'15'],['Pont fessier',3,'15'],['Mollets',4,'20']],
-      none:[['Squat au poids du corps',4,'15-20'],['Fentes',3,'12/jambe'],['Squat bulgare',3,'10/jambe'],['Pont fessier',3,'15'],['Chaise (isométrie)',3,'45 s'],['Mollets',4,'20']]
+      none:[['Squat au poids du corps',4,'15-20'],['Fentes',3,'12/jambe'],['Squat bulgare',3,'10/jambe'],['Squat sauté',3,'12'],['Fentes sautées',3,'10/jambe'],['Pont fessier',3,'15'],['Pont fessier une jambe',3,'12/jambe'],['Chaise (wall sit)',3,'45 s'],['Montées sur marche',3,'12/jambe'],['Mollets',4,'20']]
     },
     upper:{
       full:[['Développé couché',4,'6-8'],['Tractions',4,'6-10'],['Développé militaire',3,'8-10'],['Rowing barre',3,'8-10'],['Élévations latérales',3,'15'],['Curl biceps',3,'12']],
@@ -1063,6 +1063,12 @@ function muscuExo(group,tier){
       home:[['Squat gobelet',4,'10'],['Développé haltères',3,'10'],['Rowing haltère',3,'10'],['Fentes',3,'10/jambe'],['Gainage planche',3,'45 s']],
       mini:[['Squat élastique',4,'15'],['Développé élastique',3,'12'],['Tirage élastique',3,'12'],['Fentes',3,'12/jambe'],['Gainage planche',3,'45 s']],
       none:[['Squat',4,'15-20'],['Pompes',3,'max'],['Rowing australien',3,'max'],['Fentes',3,'12/jambe'],['Gainage planche',3,'45 s']]
+    },
+    core:{
+      full:[['Gainage planche',3,'45 s'],['Relevés de jambes suspendu',3,'12'],['Crunch lesté',3,'15'],['Gainage latéral',3,'30 s/côté'],['Russian twist lesté',3,'20'],['Roue abdominale',3,'10']],
+      home:[['Gainage planche',3,'45 s'],['Relevés de jambes',3,'12'],['Crunch',3,'20'],['Gainage latéral',3,'30 s/côté'],['Hollow hold',3,'30 s'],['Russian twist',3,'20']],
+      mini:[['Gainage planche',3,'45 s'],['Relevés de jambes',3,'12'],['Crunch',3,'20'],['Gainage latéral',3,'30 s/côté'],['Mountain climbers',3,'30'],['Hollow hold',3,'30 s']],
+      none:[['Gainage planche',3,'30-45 s'],['Gainage latéral',3,'25 s/côté'],['Relevés de jambes',3,'12'],['Crunch (enroulé)',3,'20'],['Hollow hold',3,'25 s'],['Mountain climbers',3,'30'],['Russian twist',3,'20'],['Superman',3,'15']]
     }
   };
   return (L[group]&&L[group][tier])||L.full.none;
@@ -1178,7 +1184,7 @@ async function doToggleMuscuDone(){
   try{ await db.from('profiles').update({muscu_program:S.muscu}).eq('id',S.user.id); if(S.profile)S.profile.muscu_program=S.muscu; }catch(e){}
   render();
 }
-function grpFromLabel(lab){ lab=(lab||'').toLowerCase(); if(lab.indexOf('push')>=0)return 'push'; if(lab.indexOf('pull')>=0)return 'pull'; if(lab.indexOf('legs')>=0||lab.indexOf('jambe')>=0)return 'legs'; if(lab.indexOf('haut')>=0)return 'upper'; if(lab.indexOf('bas')>=0)return 'lower'; return 'full'; }
+function grpFromLabel(lab){ lab=(lab||'').toLowerCase(); if(lab.indexOf('abdo')>=0||lab.indexOf('gainage')>=0||lab.indexOf('core')>=0)return 'core'; if(lab.indexOf('push')>=0)return 'push'; if(lab.indexOf('pull')>=0)return 'pull'; if(lab.indexOf('legs')>=0||lab.indexOf('jambe')>=0)return 'legs'; if(lab.indexOf('haut')>=0)return 'upper'; if(lab.indexOf('bas')>=0)return 'lower'; return 'full'; }
 async function doRegenMuscuDay(){
   var idx=S.selMuscuDay; if(idx==null||!S.muscu) return; var d=S.muscu.days[idx];
   var eqEl=document.getElementById('md-equip'); var equip=(eqEl&&eqEl.value)||d.equip||S.muscu.equip||'Salle de sport (basique)';
@@ -1221,7 +1227,8 @@ function exoInfo(name){
 }
 function openVideo(name){ try{ window.open('https://www.youtube.com/results?search_query='+encodeURIComponent((name||'')+' exercice technique'),'_blank'); }catch(e){} }
 function grpFromExoName(n){ n=(n||'').toLowerCase();
-  if(/leg curl|squat|fente|soulev|presse|mollet|jambe|fessier|pont|chaise/.test(n)) return 'legs';
+  if(/gainage|planche|abdo|crunch|hollow|mountain climber|oblique|russian twist|relev.{0,6}jambe|sit.?up|v.?up/.test(n)) return 'core';
+  if(/leg curl|squat|fente|soulev|presse|mollet|jambe|fessier|pont|chaise|wall sit/.test(n)) return 'legs';
   if(/pompe|développé couché|développé incliné|dips|pec/.test(n)) return 'push';
   if(/militaire|épaule|élévation|pike/.test(n)) return 'push';
   if(/traction|rowing|tirage|face pull|curl|dos|superman|oiseau/.test(n)) return 'pull';
@@ -1239,6 +1246,7 @@ function scrExoDetail(){
     backScr='muscuday'; dEquip=d.equip||(S.muscu&&S.muscu.equip)||'Salle de sport (basique)'; dGrp=d.grp||grpFromLabel(d.label); deload=!!d.deload; usedArr=d.exercises.map(function(x){return x.name;});
   }
   S.selExoDeload=deload;
+  if(!dGrp) dGrp='full';
   var info=exoInfo(e.name);
   var tb='<div class="tbar"><button class="ic" onclick="go(\''+backScr+'\')"><i class="ti ti-chevron-left"></i></button><h2 style="font-size:18px">'+esc(e.name)+'</h2><span style="width:38px"></span></div>';
   var msg=S.msg?'<div class="msg '+S.msg.k+'">'+S.msg.t+'</div>':'';
