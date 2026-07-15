@@ -968,7 +968,16 @@ async function doResetRunPlan(){
   try{ await db.from('profiles').update({run_plan:null}).eq('id',S.user.id); }catch(e){}
   S.screen='runplanopts'; render();
 }
-function openRunSession(wi,si){ S.selRun={w:wi,s:si}; S.screen='runsession'; render(); }
+function openRunSession(wi,si){ S.selRun={w:wi,s:si}; S.homeRun=false; S.screen='runsession'; render(); }
+function toggleHomeRun(){ S.homeRun=!S.homeRun; render(); }
+function homeCardioPlan(t){
+  var s=String(t||'').toLowerCase();
+  var isFrac=/frac|vma|seuil|inter|tempo|côte|cote|30\/30/.test(s);
+  var isLong=/long/.test(s);
+  if(isFrac){ return { titre:'Fractionné maison', dur:'~30 min', wu:'5 min facile : marche sur place, montées de genoux lentes, rotations épaules/hanches.', main:['8 à 10 rounds : 40 s d\'effort intense / 20 s de récupération (marche sur place).','Change de mouvement à chaque round : montées de genoux · jumping jacks · burpees · mountain climbers · squats sautés · corde à sauter (réelle ou simulée).'], cd:'5 min de marche lente + étirements.', note:'Sur les 40 s, tu dois être bien essoufflé. Sans impact : remplace les sauts par des montées sur une marche.' }; }
+  if(isLong){ return { titre:'Sortie longue maison', dur:'~45–55 min', wu:'8 min progressif : marche active puis montées de genoux et talons-fesses souples.', main:['45 à 55 min EN CONTINU à allure facile (tu dois pouvoir parler).','Enchaîne des blocs de 5 min en tournant : step sur une marche · jumping jacks lents · marche rapide genoux hauts · shadow boxing · fentes alternées.'], cd:'5–8 min de marche + étirements longs.', note:'Reste en aisance respiratoire du début à la fin : c\'est du volume, pas de l\'intensité.' }; }
+  return { titre:'Footing maison', dur:'~30–35 min', wu:'5 min : marche active, mobilité chevilles et hanches.', main:['30 à 35 min EN CONTINU à intensité modérée.','Blocs de 4 min à faire tourner : montées de genoux souples · jumping jacks · step sur une marche · talons-fesses · marche rapide sur place.'], cd:'5 min de marche + étirements.', note:'Intensité « je peux tenir une conversation ». Sans impact : privilégie les montées de step aux sauts.' };
+}
 function scrRunSession(){
   var sel=S.selRun; if(!sel||!S.runPlan) return scrRuns();
   var w=S.runPlan.weeks[sel.w]; if(!w) return scrRuns(); var s=w.sessions[sel.s]; if(!s) return scrRuns();
@@ -977,10 +986,20 @@ function scrRunSession(){
   var tb='<div class="tbar"><button class="ic" onclick="go(\'runs\')"><i class="ti ti-chevron-left"></i></button><h2 style="font-size:18px">'+runTypeLabel(s.t)+'</h2><span style="width:38px"></span></div>';
   var head='<div class="banner" style="background:'+runTypeBg(s.t)+'"><i class="ti ti-run" style="color:'+runTypeCol(s.t)+'"></i><div class="x"><b style="color:'+runTypeCol(s.t)+'">Semaine '+w.n+' · '+esc(w.f)+'</b><br><span style="color:var(--ink)">'+ds+'</span></div></div>';
   function block(ic,title,txt){ return '<div class="ex"><div class="n"><i class="ti '+ic+'"></i></div><div class="m"><div class="nm">'+title+'</div><div class="ds" style="font-size:13px;line-height:1.5">'+esc(txt)+'</div></div></div>'; }
-  var card='<div class="card" style="padding:6px 14px">'+block('ti-flame','1. Échauffement',base.wu)+block('ti-run','2. La séance',s.m)+block('ti-stretching','3. Retour au calme',base.cd)+'</div>';
-  var tip='<div class="banner" style="background:var(--amber-bg)"><i class="ti ti-bulb" style="color:var(--amber)"></i><div class="x" style="color:#7a4a12"><b>Conseil débutant</b><br><span style="color:var(--ink)">'+esc(base.tip)+'</span></div></div>';
+  var homeBtn='<button class="btn outline" onclick="toggleHomeRun()" style="margin-bottom:9px"><i class="ti '+(S.homeRun?'ti-run':'ti-home')+'"></i> '+(S.homeRun?'Revenir à la version course':'Je ne peux pas sortir → version maison')+'</button>';
+  var card, tip;
+  if(S.homeRun){
+    var hc=homeCardioPlan(s.t);
+    var items=hc.main.map(function(x){return '<div style="margin-bottom:4px">• '+esc(x)+'</div>';}).join('');
+    var mainBlk='<div class="ex"><div class="n"><i class="ti ti-home"></i></div><div class="m"><div class="nm">2. Cardio maison ('+esc(hc.dur)+')</div><div class="ds" style="font-size:13px;line-height:1.5">'+items+'</div></div></div>';
+    card='<div class="banner" style="background:var(--accent-soft)"><i class="ti ti-home" style="color:var(--accent)"></i><div class="x" style="color:#1742a5"><b>Version maison — '+esc(hc.titre)+'</b><br><span style="color:var(--ink)">Équivalent sans sortir, effort comparable.</span></div></div><div class="card" style="padding:6px 14px">'+block('ti-flame','1. Échauffement',hc.wu)+mainBlk+block('ti-stretching','3. Retour au calme',hc.cd)+'</div>';
+    tip='<div class="banner" style="background:var(--amber-bg)"><i class="ti ti-bulb" style="color:var(--amber)"></i><div class="x" style="color:#7a4a12"><b>Adapte à ta forme</b><br><span style="color:var(--ink)">'+esc(hc.note)+'</span></div></div>';
+  } else {
+    card='<div class="card" style="padding:6px 14px">'+block('ti-flame','1. Échauffement',base.wu)+block('ti-run','2. La séance',s.m)+block('ti-stretching','3. Retour au calme',base.cd)+'</div>';
+    tip='<div class="banner" style="background:var(--amber-bg)"><i class="ti ti-bulb" style="color:var(--amber)"></i><div class="x" style="color:#7a4a12"><b>Conseil débutant</b><br><span style="color:var(--ink)">'+esc(base.tip)+'</span></div></div>';
+  }
   var btn=s.done?'<div class="banner" style="background:var(--green-bg)"><i class="ti ti-circle-check" style="color:var(--green)"></i><div class="x" style="color:var(--green)"><b>Séance faite — bravo !</b></div></div><button class="btn outline" onclick="doToggleRunDone()">Annuler « faite »</button>':'<button class="btn" onclick="doToggleRunDone()"><i class="ti ti-check"></i> Marquer comme faite</button>';
-  return tb+head+card+tip+btn;
+  return tb+head+card+tip+homeBtn+btn;
 }
 async function doToggleRunDone(){
   var sel=S.selRun; if(!sel||!S.runPlan) return; var s=S.runPlan.weeks[sel.w].sessions[sel.s];
@@ -1641,7 +1660,7 @@ function restSeconds(str){ if(!str) return 90; str=String(str).toLowerCase(); va
 function startRestFor(i){ var e=(S.exercises||[])[i]; startRest(restSeconds(e&&e.rest)); }
 function startRestMuscu(i){ var d=(S.muscu&&S.muscu.days)?S.muscu.days[S.selMuscuDay]:null; var e=d&&d.exercises?d.exercises[i]:null; startRest(restSeconds((e&&e.rest)||'2 min')); }
 function openMuscuDayFromCal(di){ S.selMuscuDay=di; S.screen='muscuday'; render(); }
-function openRunFromCal(wi,si){ S.selRun={w:wi,s:si}; S.screen='runsession'; render(); }
+function openRunFromCal(wi,si){ S.selRun={w:wi,s:si}; S.homeRun=false; S.screen='runsession'; render(); }
 function todayPlanCard(){
   var ev=(calEvents()[today()]||[]).filter(function(e){ return e.kind==='muscu'||e.kind==='run'; });
   if(!ev.length) return '';
