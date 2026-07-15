@@ -211,7 +211,7 @@ function scrDash(){
   } else {
     scoreCard = '<div class="banner" style="background:var(--accent-soft)"><i class="ti ti-info-circle" style="color:var(--accent)"></i><div class="x" style="color:#1742a5">Tu n\'as pas encore fait ton check-in du jour. Il calcule ton score de forme et adapte ta séance.</div></div><button class="btn" onclick="go(\'checkin\')"><i class="ti ti-circle-plus"></i> Faire mon check-in</button>';
   }
-  let goalHint = goalsSection(true);
+  let goalHint = goalsMiniCard();
   const wk = S.workout;
   let seance;
   if(wk){
@@ -221,11 +221,12 @@ function scrDash(){
   }
   const w = S.weights; const lastW = w.length ? Number(w[w.length-1].weight).toFixed(1)+' kg' : '—';
   return '<div class="tbar"><div><div class="t">'+new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'})+'</div><h2>Bonjour, '+esc(displayName())+'</h2></div><button class="ic" onclick="go(\'profile\')" title="Mon profil"><i class="ti ti-user"></i></button></div>'+
-    inactivityCard()+goalHint+compBanner()+(p.role==='admin'?'<div class="card" onclick="go(\'coach\')" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between"><div style="display:flex;align-items:center;gap:10px"><i class="ti ti-users" style="color:var(--accent);font-size:20px"></i><span style="font-weight:700">Espace coach</span></div><i class="ti ti-chevron-right" style="color:var(--faint)"></i></div>':'')+scoreCard+
+    topAlert()+compBanner()+(p.role==='admin'?'<div class="card" onclick="go(\'coach\')" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between"><div style="display:flex;align-items:center;gap:10px"><i class="ti ti-users" style="color:var(--accent);font-size:20px"></i><span style="font-weight:700">Espace coach</span></div><i class="ti ti-chevron-right" style="color:var(--faint)"></i></div>':'')+scoreCard+
     (hasScore?'<button class="btn outline" onclick="go(\'checkin\')" style="margin-bottom:13px"><i class="ti ti-refresh"></i> Modifier mon check-in du jour</button>':'')+
     todayPlanCard()+
     seance+
-    '<div class="card"><div class="row" style="margin-bottom:10px"><div class="label">Poids actuel</div><span class="sub" style="font-weight:700;color:var(--ink)">'+lastW+'</span></div>'+weightSVG(w)+'</div>'+'<div class="card" onclick="go(\'programopts\')" style="cursor:pointer;background:var(--accent);border:none"><div style="font-weight:700;font-size:15px;color:#fff"><i class="ti ti-wand"></i> Créer mon programme complet</div><div style="font-size:12px;color:#fff;opacity:.9;margin-top:3px">Muscu + course + objectif, sur un seul planning</div></div>'+'<div class="label" style="margin:14px 2px 8px">Mes outils</div><div class="tiles">'+tile('ti-barbell','Programme muscu','muscu')+tile('ti-run','Sorties course','runs')+tile('ti-salad','Nutrition','nutrition')+tile('ti-calendar-event','Agenda','calendar')+tile('ti-chart-line','Charges','charges')+tile('ti-robot','Assistant IA','assistant')+tile('ti-file-text','Rapport','report')+tile('ti-trophy','Compétitions','comps')+tile('ti-clipboard-check','Mes tests','tests')+tile('ti-medal','Mes badges','badges')+tile('ti-crown','Classement','leaderboard')+tile('ti-message-circle','Avis','feedback')+'</div>';
+    goalHint+
+    '<div class="card" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:13px"><span class="label" style="margin:0">Poids actuel</span><span style="font-weight:700;color:var(--ink)">'+lastW+'</span></div>'+'<div class="card" onclick="go(\'programopts\')" style="cursor:pointer;background:var(--accent);border:none"><div style="font-weight:700;font-size:15px;color:#fff"><i class="ti ti-wand"></i> Créer mon programme complet</div><div style="font-size:12px;color:#fff;opacity:.9;margin-top:3px">Muscu + course + objectif, sur un seul planning</div></div>'+'<div class="label" style="margin:14px 2px 8px">Mes outils</div><div class="tiles">'+tile('ti-barbell','Programme muscu','muscu')+tile('ti-run','Sorties course','runs')+tile('ti-salad','Nutrition','nutrition')+tile('ti-calendar-event','Agenda','calendar')+tile('ti-chart-line','Charges','charges')+tile('ti-robot','Assistant IA','assistant')+tile('ti-file-text','Rapport','report')+tile('ti-trophy','Compétitions','comps')+tile('ti-clipboard-check','Mes tests','tests')+tile('ti-award','Records','records')+tile('ti-medal','Mes badges','badges')+tile('ti-crown','Classement','leaderboard')+tile('ti-message-circle','Avis','feedback')+'</div>';
 }
 function scrWorkout(){
   if(S.generating){ return '<div class="tbar"><button class="ic" onclick="go(\'dash\')"><i class="ti ti-chevron-left"></i></button><h2 style="font-size:19px">Séance du jour</h2><span style="width:38px"></span></div><div class="center" style="min-height:380px"><div class="spin" style="border-color:var(--accent);border-top-color:transparent;width:30px;height:30px"></div><div>L\'IA génère ta séance…</div><div class="sub">Quelques secondes</div></div>'; }
@@ -1681,6 +1682,49 @@ function todayPlanCard(){
   }).join('');
   return '<div class="card" style="background:var(--accent);border:none;padding:14px 15px"><div style="color:#fff;font-weight:800;font-size:15px"><i class="ti ti-calendar-star" style="vertical-align:-2px"></i> Au programme aujourd\'hui</div><div style="color:#fff;opacity:.85;font-size:12px;margin-top:2px">Ta séance planifiée — touche pour l\'ouvrir.</div>'+rows+'</div>';
 }
+function prList(){
+  var lifts=S.lifts||[]; var best={};
+  lifts.forEach(function(l){ if(!(l.load>0)) return; var n=l.name; if(!best[n]||l.load>best[n].load){ best[n]={load:l.load,date:l.date}; } });
+  return Object.keys(best).map(function(n){ return {name:n, load:best[n].load, date:best[n].date}; }).sort(function(a,b){return b.load-a.load;});
+}
+function newPRs(){
+  var byName={}; (S.lifts||[]).forEach(function(l){ if(!(l.load>0))return; (byName[l.name]=byName[l.name]||[]).push(l); });
+  var out=[];
+  Object.keys(byName).forEach(function(n){ var arr=byName[n]; if(arr.length<2) return; var maxPrev=-Infinity; for(var i=0;i<arr.length-1;i++){ if(arr[i].load>maxPrev) maxPrev=arr[i].load; } var last=arr[arr.length-1]; if(last.load>maxPrev && last.date && daysSince(last.date)<=2){ out.push({name:n, load:last.load, prev:maxPrev}); } });
+  return out;
+}
+function prCelebrationCard(){
+  var prs=newPRs(); if(!prs.length) return '';
+  var rows=prs.slice(0,3).map(function(p){ return '<div style="color:#fff;font-weight:700;margin-top:3px">🏆 '+esc(p.name)+' : '+p.load+' kg <span style="opacity:.85;font-weight:600;font-size:12px">(avant '+p.prev+' kg)</span></div>'; }).join('');
+  return '<div class="card" style="background:linear-gradient(135deg,#F59E0B,#F97316);border:none;padding:14px 15px"><div style="color:#fff;font-weight:800;font-size:15px">Nouveau record — bravo ! 💪</div>'+rows+'</div>';
+}
+var TEST_LABELS={pft:'Hyrox P\'F"T',vma:'VMA',force:'Force (1RM)',pompes:'Pompes',tractions:'Tractions',gainage:'Gainage'};
+var TEST_UNITS={pft:'min',vma:'km/h',force:'kg',pompes:'reps',tractions:'reps',gainage:'s'};
+function testRecords(){
+  var t=S.tests||[]; var by={};
+  t.forEach(function(x){ var lower=(x.type==='pft'); var v=Number(x.value); if(isNaN(v))return; var cur=by[x.type]; if(!cur){ by[x.type]=x; } else { var cv=Number(cur.value); if(lower? v<cv : v>cv) by[x.type]=x; } });
+  return by;
+}
+function scrRecords(){
+  var tb='<div class="tbar"><button class="ic" onclick="go(\'dash\')"><i class="ti ti-chevron-left"></i></button><h2 style="font-size:19px">Mes records</h2><span style="width:38px"></span></div>';
+  var prs=prList();
+  var liftRows=prs.length?prs.map(function(p){ var ds=p.date?('le '+(function(){var d=new Date(p.date+'T00:00:00');return isNaN(d)?p.date:d.toLocaleDateString('fr-FR');})()):''; return '<div class="ath"><div class="m"><div class="nm">'+esc(p.name)+'</div><div class="ds">'+ds+'</div></div><span style="font-weight:800;color:var(--accent);font-size:15px">'+p.load+' kg</span></div>'; }).join(''):'<div class="sub" style="padding:10px 2px">Pas encore de charge enregistrée. Saisis tes charges (kg) dans tes séances : tes records apparaîtront ici.</div>';
+  var tr=testRecords(); var tkeys=Object.keys(tr);
+  var testRows=tkeys.length?tkeys.map(function(k){ var x=tr[k]; return '<div class="ath"><div class="m"><div class="nm">'+esc(TEST_LABELS[k]||k)+'</div><div class="ds">'+esc(x.note||'')+'</div></div><span style="font-weight:800;color:var(--green);font-size:15px">'+esc(x.value)+' '+(TEST_UNITS[k]||'')+'</span></div>'; }).join(''):'<div class="sub" style="padding:10px 2px">Aucun test enregistré. Va dans « Mes tests » pour les faire.</div>';
+  return tb+'<div class="banner" style="background:var(--accent-soft)"><i class="ti ti-award" style="color:var(--accent)"></i><div class="x" style="color:#1742a5">Tes meilleures performances, mises à jour automatiquement depuis tes charges et tes tests.</div></div>'+'<div class="label" style="margin:4px 2px 8px">Charges (meilleures)</div><div class="card" style="padding:4px 14px">'+liftRows+'</div>'+'<div class="label" style="margin:14px 2px 8px">Tests</div><div class="card" style="padding:4px 14px">'+testRows+'</div>';
+}
+function goalsMiniCard(){
+  var gs=getGoals(true);
+  if(!gs.length) return goalPrompt();
+  var rows=gs.map(function(g){
+    var ts=g.targets||[]; var sub, bar='';
+    if(ts.length){ var pr=goalProgress(ts[0], true); var pct=pr.pct; bar=pct!=null?'<div style="height:6px;background:var(--line);border-radius:20px;overflow:hidden;margin-top:5px"><div style="height:100%;width:'+pct+'%;background:var(--accent);border-radius:20px"></div></div>':''; sub='<div class="sub">'+(ts.length>1?ts.length+' cibles · ':'')+goalTargetName(ts[0])+(pct!=null?' · <b style="color:var(--accent)">'+pct+'%</b>':'')+'</div>'; }
+    else sub='<div class="sub">Discipline</div>';
+    return '<div style="padding:8px 0;border-top:1px solid var(--line)"><div style="font-weight:700;font-size:14px">'+esc(g.discipline||'Objectif')+'</div>'+sub+bar+'</div>';
+  }).join('');
+  return '<div class="card" onclick="openMyGoals()" style="cursor:pointer"><div class="row"><div class="label" style="color:var(--accent)"><i class="ti ti-target" style="vertical-align:-2px"></i> Mes objectifs</div><i class="ti ti-chevron-right" style="color:var(--faint)"></i></div>'+rows+'</div>';
+}
+function topAlert(){ var a=prCelebrationCard(); return a||inactivityCard(); }
 function lastActiveDate(){
   var dates=[];
   if(S.todayCheckin) dates.push(today());
@@ -1731,7 +1775,7 @@ function render(extra){
   else if(S.screen==='onboarding'){ html=scrOnboarding(); nav.style.display='none'; }
   else if(S.screen==='result'){ html=scrResult(extra); nav.style.display='flex'; nav.innerHTML=navBar(); }
   else { nav.style.display='flex'; nav.innerHTML=navBar();
-    html = S.screen==='checkin'?scrCheckin():(S.screen==='workout'?scrWorkout():(S.screen==='profile'?scrProfile():(S.screen==='genopts'?scrGenOptions():(S.screen==='charges'?scrCharges():(S.screen==='calendar'?scrCalendar():(S.screen==='coach'?scrCoach():(S.screen==='coachDetail'?scrCoachDetail():(S.screen==='nutrition'?scrNutrition():(S.screen==='runs'?scrRuns():(S.screen==='badges'?scrBadges():(S.screen==='feedback'?scrFeedback():(S.screen==='comps'?scrComps():(S.screen==='assistant'?scrAssistant():(S.screen==='report'?scrReport():(S.screen==='runplanopts'?scrRunPlanOpts():(S.screen==='runsession'?scrRunSession():(S.screen==='newathlete'?scrNewAthlete():(S.screen==='athleteEdit'?scrAthleteEdit():(S.screen==='muscu'?scrMuscu():(S.screen==='muscuopts'?scrMuscuOpts():(S.screen==='muscuday'?scrMuscuDay():(S.screen==='exodetail'?scrExoDetail():(S.screen==='leaderboard'?scrLeaderboard():(S.screen==='groupsession'?scrGroupSession():(S.screen==='programopts'?scrProgramOpts():(S.screen==='tests'?scrTests():(S.screen==='goals'?scrGoals():(S.screen==='goaledit'?scrGoalEdit():scrDash()))))))))))))))))))))))))))));
+    html = S.screen==='checkin'?scrCheckin():(S.screen==='workout'?scrWorkout():(S.screen==='profile'?scrProfile():(S.screen==='genopts'?scrGenOptions():(S.screen==='charges'?scrCharges():(S.screen==='calendar'?scrCalendar():(S.screen==='coach'?scrCoach():(S.screen==='coachDetail'?scrCoachDetail():(S.screen==='nutrition'?scrNutrition():(S.screen==='runs'?scrRuns():(S.screen==='badges'?scrBadges():(S.screen==='feedback'?scrFeedback():(S.screen==='comps'?scrComps():(S.screen==='assistant'?scrAssistant():(S.screen==='report'?scrReport():(S.screen==='runplanopts'?scrRunPlanOpts():(S.screen==='runsession'?scrRunSession():(S.screen==='newathlete'?scrNewAthlete():(S.screen==='athleteEdit'?scrAthleteEdit():(S.screen==='muscu'?scrMuscu():(S.screen==='muscuopts'?scrMuscuOpts():(S.screen==='muscuday'?scrMuscuDay():(S.screen==='exodetail'?scrExoDetail():(S.screen==='leaderboard'?scrLeaderboard():(S.screen==='groupsession'?scrGroupSession():(S.screen==='programopts'?scrProgramOpts():(S.screen==='tests'?scrTests():(S.screen==='goals'?scrGoals():(S.screen==='goaledit'?scrGoalEdit():(S.screen==='records'?scrRecords():scrDash())))))))))))))))))))))))))))));
   }
   sc.innerHTML=html; sc.scrollTop=0; S.msg=null;
   const e=document.getElementById('i-email'); if(e) e.addEventListener('keydown',ev=>{if(ev.key==='Enter')document.getElementById('i-pass').focus();});
@@ -1788,3 +1832,4 @@ async function doGenerate(){
 </script>
 </body>
 </html>
+
