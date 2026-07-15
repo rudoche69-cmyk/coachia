@@ -221,7 +221,7 @@ function scrDash(){
   }
   const w = S.weights; const lastW = w.length ? Number(w[w.length-1].weight).toFixed(1)+' kg' : '—';
   return '<div class="tbar"><div><div class="t">'+new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'})+'</div><h2>Bonjour, '+esc(displayName())+'</h2></div><button class="ic" onclick="go(\'profile\')" title="Mon profil"><i class="ti ti-user"></i></button></div>'+
-    goalHint+compBanner()+(p.role==='admin'?'<div class="card" onclick="go(\'coach\')" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between"><div style="display:flex;align-items:center;gap:10px"><i class="ti ti-users" style="color:var(--accent);font-size:20px"></i><span style="font-weight:700">Espace coach</span></div><i class="ti ti-chevron-right" style="color:var(--faint)"></i></div>':'')+scoreCard+
+    inactivityCard()+goalHint+compBanner()+(p.role==='admin'?'<div class="card" onclick="go(\'coach\')" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between"><div style="display:flex;align-items:center;gap:10px"><i class="ti ti-users" style="color:var(--accent);font-size:20px"></i><span style="font-weight:700">Espace coach</span></div><i class="ti ti-chevron-right" style="color:var(--faint)"></i></div>':'')+scoreCard+
     (hasScore?'<button class="btn outline" onclick="go(\'checkin\')" style="margin-bottom:13px"><i class="ti ti-refresh"></i> Modifier mon check-in du jour</button>':'')+
     todayPlanCard()+
     seance+
@@ -248,7 +248,7 @@ function scrWorkout(){
   if(done) actions = '<div class="banner" style="background:var(--green-bg)"><i class="ti ti-circle-check" style="color:var(--green)"></i><div class="x" style="color:var(--green)"><b>Séance terminée !</b> <span style="color:var(--ink)">Bien joué.</span></div></div><button class="btn outline" onclick="go(\'genopts\')"><i class="ti ti-refresh"></i> Régénérer une séance</button>';
   else if(S.started) actions = '<button class="btn dark" onclick="finishWorkout()"><i class="ti ti-flag-check"></i> Terminer la séance</button>';
   else actions = '<button class="btn" onclick="startWorkout()"><i class="ti ti-player-play"></i> Démarrer la séance</button><button class="btn outline" style="margin-top:9px" onclick="go(\'genopts\')"><i class="ti ti-refresh"></i> Régénérer</button>';
-  return '<div class="tbar"><button class="ic" onclick="go(\'dash\')"><i class="ti ti-chevron-left"></i></button><h2 style="font-size:19px">Séance du jour</h2><span style="width:38px"></span></div>'+(S.msg?'<div class="msg '+S.msg.k+'">'+S.msg.t+'</div>':'')+head+meta+'<button class="btn outline" onclick="startStopwatch()" style="margin-bottom:12px"><i class="ti ti-stopwatch"></i> Chrono de séance</button>'+'<div class="card" style="padding:6px 14px">'+list+'</div>'+(S.exercises.length?'<button class="btn outline" onclick="doSaveLoads()"><i class="ti ti-device-floppy"></i> Enregistrer mes charges</button>':'')+coreBlock()+finisherBlock()+actions;
+  return '<div class="tbar"><button class="ic" onclick="go(\'dash\')"><i class="ti ti-chevron-left"></i></button><h2 style="font-size:19px">Séance du jour</h2><span style="width:38px"></span></div>'+(S.msg?'<div class="msg '+S.msg.k+'">'+S.msg.t+'</div>':'')+head+meta+'<button class="btn outline" onclick="startStopwatch()" style="margin-bottom:12px"><i class="ti ti-stopwatch"></i> Chrono de séance</button>'+'<div class="card" style="padding:6px 14px">'+list+'</div>'+(S.exercises.length?'<button class="btn outline" onclick="doSaveLoads()"><i class="ti ti-device-floppy"></i> Enregistrer mes charges</button>':'')+coreBlock()+finisherBlock()+rpeBlock('workout')+actions;
 }
 function scrCheckin(){
   const c = S.todayCheckin || {}; const v = (k,d)=> (c[k]!==undefined && c[k]!==null) ? c[k] : d;
@@ -1169,7 +1169,7 @@ function scrMuscuDay(){
   var eqL=[['Salle de sport complète','Salle de sport complète'],['Salle de sport (basique)','Salle de sport (basique)'],['Matériel maison (haltères/barre)','Matériel maison (haltères/barre)'],['Petit matériel (élastiques, kettlebell)','Petit matériel (élastiques, kettlebell)'],['Sans matériel (poids du corps)','Sans matériel (poids du corps)']];
   var eqOpts=eqL.map(function(x){return '<option value="'+x[0]+'"'+(eqCur===x[0]?' selected':'')+'>'+x[1]+'</option>';}).join('');
   var regen='<div class="card"><div class="flabel">Pas le même matériel aujourd\'hui ? Régénère juste cette séance :</div><select class="in" id="md-equip">'+eqOpts+'</select><button class="btn outline" onclick="doRegenMuscuDay()" style="margin-top:9px"><i class="ti ti-refresh"></i> Régénérer cette séance</button></div>';
-  return tb+msg+head+hint+'<button class="btn outline" onclick="startStopwatch()" style="margin-bottom:12px"><i class="ti ti-stopwatch"></i> Chrono de séance</button>'+'<div class="card" style="padding:6px 14px">'+list+'</div><button class="btn outline" onclick="doSaveMuscuLoads()" style="margin-bottom:9px"><i class="ti ti-device-floppy"></i> Enregistrer mes charges</button>'+coreBlock()+finisherBlock()+regen+btnDone;
+  return tb+msg+head+hint+'<button class="btn outline" onclick="startStopwatch()" style="margin-bottom:12px"><i class="ti ti-stopwatch"></i> Chrono de séance</button>'+'<div class="card" style="padding:6px 14px">'+list+'</div><button class="btn outline" onclick="doSaveMuscuLoads()" style="margin-bottom:9px"><i class="ti ti-device-floppy"></i> Enregistrer mes charges</button>'+coreBlock()+finisherBlock()+regen+rpeBlock('muscu')+btnDone;
 }
 async function doSaveMuscuLoads(){
   var idx=S.selMuscuDay; if(idx==null||!S.muscu) return; var d=S.muscu.days[idx];
@@ -1680,6 +1680,44 @@ function todayPlanCard(){
     return '<div onclick="'+onclick+'" style="cursor:pointer;display:flex;align-items:center;gap:11px;padding:10px 0;border-top:1px solid rgba(255,255,255,.22)"><i class="ti '+icon+'" style="color:#fff;font-size:19px"></i><div style="flex:1;min-width:0"><div style="color:#fff;font-weight:700;font-size:15px">'+esc(e.label)+'</div><div style="color:#fff;opacity:.85;font-size:12px">'+sub+'</div></div>'+right+'</div>';
   }).join('');
   return '<div class="card" style="background:var(--accent);border:none;padding:14px 15px"><div style="color:#fff;font-weight:800;font-size:15px"><i class="ti ti-calendar-star" style="vertical-align:-2px"></i> Au programme aujourd\'hui</div><div style="color:#fff;opacity:.85;font-size:12px;margin-top:2px">Ta séance planifiée — touche pour l\'ouvrir.</div>'+rows+'</div>';
+}
+function lastActiveDate(){
+  var dates=[];
+  if(S.todayCheckin) dates.push(today());
+  (S.history||[]).forEach(function(w){ if(w.date && w.status==='realisee') dates.push(w.date); });
+  (S.runs||[]).forEach(function(r){ if(r.date) dates.push(r.date); });
+  (S.weights||[]).forEach(function(w){ if(w.date) dates.push(w.date); });
+  if(S.muscu&&S.muscu.days) S.muscu.days.forEach(function(d){ if(d.done&&d.date) dates.push(d.date); });
+  if(!dates.length) return null;
+  dates.sort();
+  return dates[dates.length-1];
+}
+function motivPhrase(d){
+  if(d>=7) return 'Content de te revoir ! On repart en douceur, sans culpabiliser — ton corps te remerciera.';
+  if(d>=4) return 'Quelques jours sans séance, ce n\'est pas grave : l\'important, c\'est de repartir. Une mini-séance suffit pour relancer la machine.';
+  return 'Ça fait '+d+' jours — et si on reprenait tranquillement ? Même 10 minutes comptent. 💪';
+}
+function inactivityCard(){
+  var la=lastActiveDate(); if(la==null) return '';
+  var d=daysSince(la); if(d<2) return '';
+  var mini='<br><span style="color:var(--ink)">Reprise en douceur (~10 min) : 5 min de marche + mobilité, 2 × 10 squats, 2 × gainage 20 s, 2 × 10 pompes (sur les genoux si besoin). Sans forcer.</span>';
+  return '<div class="banner" style="background:var(--amber-bg)"><i class="ti ti-mood-heart" style="color:var(--amber)"></i><div class="x" style="color:#7a4a12"><b>'+esc(motivPhrase(d))+'</b>'+mini+'</div></div><button class="btn outline" onclick="go(\'genopts\')" style="margin-bottom:13px"><i class="ti ti-player-play"></i> Faire une petite séance de reprise</button>';
+}
+function rpeWord(v){ return v<=2?'très facile':(v<=4?'facile':(v<=6?'modéré':(v<=8?'difficile':'maximal'))); }
+function currentRPE(ctx){
+  if(ctx==='muscu'){ var d=(S.muscu&&S.muscu.days)?S.muscu.days[S.selMuscuDay]:null; return d?(d.rpe||null):null; }
+  try{ return parseInt(localStorage.getItem('coachia_rpe_'+today()))||null; }catch(_){ return null; }
+}
+async function setRPE(ctx,v){
+  if(ctx==='muscu'){ var d=(S.muscu&&S.muscu.days)?S.muscu.days[S.selMuscuDay]:null; if(d){ d.rpe=v; try{ await db.from('profiles').update({muscu_program:S.muscu}).eq('id',S.user.id); if(S.profile)S.profile.muscu_program=S.muscu; }catch(_){} } }
+  else { try{ localStorage.setItem('coachia_rpe_'+today(),String(v)); }catch(_){} }
+  render();
+}
+function rpeBlock(ctx){
+  var cur=currentRPE(ctx); var btns='';
+  for(var i=1;i<=10;i++){ var on=cur===i; var col=i<=3?'var(--green)':(i<=6?'var(--amber)':'var(--red)'); btns+='<button onclick="setRPE(\''+ctx+'\','+i+')" style="flex:1;min-width:0;padding:9px 0;border:1px solid '+(on?col:'var(--line)')+';background:'+(on?col:'var(--bg)')+';color:'+(on?'#fff':'var(--ink)')+';font-weight:700;border-radius:8px;font:inherit;font-size:13px;cursor:pointer">'+i+'</button>'; }
+  var lbl=cur?('<span style="color:var(--accent);font-weight:700">'+cur+'/10 — '+rpeWord(cur)+'</span>'):'<span class="sub">Note ta séance de 1 (très facile) à 10 (maximal)</span>';
+  return '<div class="card"><div class="label" style="margin-bottom:6px"><i class="ti ti-gauge" style="vertical-align:-2px"></i> Difficulté ressentie (RPE)</div><div style="margin-bottom:8px">'+lbl+'</div><div style="display:flex;gap:4px">'+btns+'</div></div>';
 }
 function navBar(){
   const b=(ic,t)=>'<button class="'+(S.screen===t?'on':'')+'" onclick="go(\''+t+'\')" style="font-size:11px;font-weight:700;color:inherit;letter-spacing:.02em">'+ic+'</button>';
