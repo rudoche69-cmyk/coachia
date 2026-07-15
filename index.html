@@ -223,6 +223,7 @@ function scrDash(){
   return '<div class="tbar"><div><div class="t">'+new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'})+'</div><h2>Bonjour, '+esc(displayName())+'</h2></div><button class="ic" onclick="go(\'profile\')" title="Mon profil"><i class="ti ti-user"></i></button></div>'+
     goalHint+compBanner()+(p.role==='admin'?'<div class="card" onclick="go(\'coach\')" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between"><div style="display:flex;align-items:center;gap:10px"><i class="ti ti-users" style="color:var(--accent);font-size:20px"></i><span style="font-weight:700">Espace coach</span></div><i class="ti ti-chevron-right" style="color:var(--faint)"></i></div>':'')+scoreCard+
     (hasScore?'<button class="btn outline" onclick="go(\'checkin\')" style="margin-bottom:13px"><i class="ti ti-refresh"></i> Modifier mon check-in du jour</button>':'')+
+    todayPlanCard()+
     seance+
     '<div class="card"><div class="row" style="margin-bottom:10px"><div class="label">Poids actuel</div><span class="sub" style="font-weight:700;color:var(--ink)">'+lastW+'</span></div>'+weightSVG(w)+'</div>'+'<div class="card" onclick="go(\'programopts\')" style="cursor:pointer;background:var(--accent);border:none"><div style="font-weight:700;font-size:15px;color:#fff"><i class="ti ti-wand"></i> Créer mon programme complet</div><div style="font-size:12px;color:#fff;opacity:.9;margin-top:3px">Muscu + course + objectif, sur un seul planning</div></div>'+'<div class="label" style="margin:14px 2px 8px">Mes outils</div><div class="tiles">'+tile('ti-barbell','Programme muscu','muscu')+tile('ti-run','Sorties course','runs')+tile('ti-salad','Nutrition','nutrition')+tile('ti-calendar-event','Agenda','calendar')+tile('ti-chart-line','Charges','charges')+tile('ti-robot','Assistant IA','assistant')+tile('ti-file-text','Rapport','report')+tile('ti-trophy','Compétitions','comps')+tile('ti-clipboard-check','Mes tests','tests')+tile('ti-medal','Mes badges','badges')+tile('ti-crown','Classement','leaderboard')+tile('ti-message-circle','Avis','feedback')+'</div>';
 }
@@ -1639,6 +1640,20 @@ function timerStop(){ TIMER.mode=null; TIMER.running=false; if(TIMER.id){ clearI
 function restSeconds(str){ if(!str) return 90; str=String(str).toLowerCase(); var m; if((m=str.match(/(\d+)\s*min(?:\s*(\d+))?/))){ return parseInt(m[1])*60+(m[2]?parseInt(m[2]):0); } if((m=str.match(/(\d+)\s*[:’'](\d+)/))){ return parseInt(m[1])*60+parseInt(m[2]); } if((m=str.match(/(\d+)\s*s/))){ return parseInt(m[1]); } if((m=str.match(/(\d+)/))){ var n=parseInt(m[1]); return n<10?n*60:n; } return 90; }
 function startRestFor(i){ var e=(S.exercises||[])[i]; startRest(restSeconds(e&&e.rest)); }
 function startRestMuscu(i){ var d=(S.muscu&&S.muscu.days)?S.muscu.days[S.selMuscuDay]:null; var e=d&&d.exercises?d.exercises[i]:null; startRest(restSeconds((e&&e.rest)||'2 min')); }
+function openMuscuDayFromCal(di){ S.selMuscuDay=di; S.screen='muscuday'; render(); }
+function openRunFromCal(wi,si){ S.selRun={w:wi,s:si}; S.screen='runsession'; render(); }
+function todayPlanCard(){
+  var ev=(calEvents()[today()]||[]).filter(function(e){ return e.kind==='muscu'||e.kind==='run'; });
+  if(!ev.length) return '';
+  var rows=ev.map(function(e){
+    var onclick, icon, sub;
+    if(e.kind==='muscu'){ onclick='openMuscuDayFromCal('+e.di+')'; icon='ti-barbell'; sub='Musculation'; }
+    else { onclick='openRunFromCal('+e.wi+','+e.si+')'; icon='ti-run'; sub='Course à pied'; }
+    var right=e.done?'<span style="background:rgba(255,255,255,.25);color:#fff;font-size:11px;font-weight:700;padding:2px 9px;border-radius:20px">Fait ✓</span>':'<i class="ti ti-chevron-right" style="color:#fff;opacity:.9;font-size:20px"></i>';
+    return '<div onclick="'+onclick+'" style="cursor:pointer;display:flex;align-items:center;gap:11px;padding:10px 0;border-top:1px solid rgba(255,255,255,.22)"><i class="ti '+icon+'" style="color:#fff;font-size:19px"></i><div style="flex:1;min-width:0"><div style="color:#fff;font-weight:700;font-size:15px">'+esc(e.label)+'</div><div style="color:#fff;opacity:.85;font-size:12px">'+sub+'</div></div>'+right+'</div>';
+  }).join('');
+  return '<div class="card" style="background:var(--accent);border:none;padding:14px 15px"><div style="color:#fff;font-weight:800;font-size:15px"><i class="ti ti-calendar-star" style="vertical-align:-2px"></i> Au programme aujourd\'hui</div><div style="color:#fff;opacity:.85;font-size:12px;margin-top:2px">Ta séance planifiée — touche pour l\'ouvrir.</div>'+rows+'</div>';
+}
 function navBar(){
   const b=(ic,t)=>'<button class="'+(S.screen===t?'on':'')+'" onclick="go(\''+t+'\')" style="font-size:11px;font-weight:700;color:inherit;letter-spacing:.02em">'+ic+'</button>';
   var ckDot=(S.user && !S.todayCheckin)?'<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--red);margin-left:4px;vertical-align:middle"></span>':'';
