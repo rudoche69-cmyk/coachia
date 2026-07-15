@@ -247,7 +247,7 @@ function scrWorkout(){
   if(done) actions = '<div class="banner" style="background:var(--green-bg)"><i class="ti ti-circle-check" style="color:var(--green)"></i><div class="x" style="color:var(--green)"><b>Séance terminée !</b> <span style="color:var(--ink)">Bien joué.</span></div></div><button class="btn outline" onclick="go(\'genopts\')"><i class="ti ti-refresh"></i> Régénérer une séance</button>';
   else if(S.started) actions = '<button class="btn dark" onclick="finishWorkout()"><i class="ti ti-flag-check"></i> Terminer la séance</button>';
   else actions = '<button class="btn" onclick="startWorkout()"><i class="ti ti-player-play"></i> Démarrer la séance</button><button class="btn outline" style="margin-top:9px" onclick="go(\'genopts\')"><i class="ti ti-refresh"></i> Régénérer</button>';
-  return '<div class="tbar"><button class="ic" onclick="go(\'dash\')"><i class="ti ti-chevron-left"></i></button><h2 style="font-size:19px">Séance du jour</h2><span style="width:38px"></span></div>'+(S.msg?'<div class="msg '+S.msg.k+'">'+S.msg.t+'</div>':'')+head+meta+'<button class="btn outline" onclick="startStopwatch()" style="margin-bottom:12px"><i class="ti ti-stopwatch"></i> Chrono de séance</button>'+'<div class="card" style="padding:6px 14px">'+list+'</div>'+(S.exercises.length?'<button class="btn outline" onclick="doSaveLoads()"><i class="ti ti-device-floppy"></i> Enregistrer mes charges</button>':'')+actions;
+  return '<div class="tbar"><button class="ic" onclick="go(\'dash\')"><i class="ti ti-chevron-left"></i></button><h2 style="font-size:19px">Séance du jour</h2><span style="width:38px"></span></div>'+(S.msg?'<div class="msg '+S.msg.k+'">'+S.msg.t+'</div>':'')+head+meta+'<button class="btn outline" onclick="startStopwatch()" style="margin-bottom:12px"><i class="ti ti-stopwatch"></i> Chrono de séance</button>'+'<div class="card" style="padding:6px 14px">'+list+'</div>'+(S.exercises.length?'<button class="btn outline" onclick="doSaveLoads()"><i class="ti ti-device-floppy"></i> Enregistrer mes charges</button>':'')+coreBlock()+finisherBlock()+actions;
 }
 function scrCheckin(){
   const c = S.todayCheckin || {}; const v = (k,d)=> (c[k]!==undefined && c[k]!==null) ? c[k] : d;
@@ -1143,7 +1143,7 @@ function scrMuscuDay(){
   var eqL=[['Salle de sport complète','Salle de sport complète'],['Salle de sport (basique)','Salle de sport (basique)'],['Matériel maison (haltères/barre)','Matériel maison (haltères/barre)'],['Petit matériel (élastiques, kettlebell)','Petit matériel (élastiques, kettlebell)'],['Sans matériel (poids du corps)','Sans matériel (poids du corps)']];
   var eqOpts=eqL.map(function(x){return '<option value="'+x[0]+'"'+(eqCur===x[0]?' selected':'')+'>'+x[1]+'</option>';}).join('');
   var regen='<div class="card"><div class="flabel">Pas le même matériel aujourd\'hui ? Régénère juste cette séance :</div><select class="in" id="md-equip">'+eqOpts+'</select><button class="btn outline" onclick="doRegenMuscuDay()" style="margin-top:9px"><i class="ti ti-refresh"></i> Régénérer cette séance</button></div>';
-  return tb+msg+head+hint+'<button class="btn outline" onclick="startStopwatch()" style="margin-bottom:12px"><i class="ti ti-stopwatch"></i> Chrono de séance</button>'+'<div class="card" style="padding:6px 14px">'+list+'</div><button class="btn outline" onclick="doSaveMuscuLoads()" style="margin-bottom:9px"><i class="ti ti-device-floppy"></i> Enregistrer mes charges</button>'+regen+btnDone;
+  return tb+msg+head+hint+'<button class="btn outline" onclick="startStopwatch()" style="margin-bottom:12px"><i class="ti ti-stopwatch"></i> Chrono de séance</button>'+'<div class="card" style="padding:6px 14px">'+list+'</div><button class="btn outline" onclick="doSaveMuscuLoads()" style="margin-bottom:9px"><i class="ti ti-device-floppy"></i> Enregistrer mes charges</button>'+coreBlock()+finisherBlock()+regen+btnDone;
 }
 async function doSaveMuscuLoads(){
   var idx=S.selMuscuDay; if(idx==null||!S.muscu) return; var d=S.muscu.days[idx];
@@ -1582,6 +1582,31 @@ async function saveGoals(self, arr){
   var r=await db.from('profiles').update(upd).eq('id',id); if(r.error) throw r.error;
   if(self){ if(S.profile){ S.profile.goal_detail=arr; S.profile.main_goal=disc; if(poids!=null)S.profile.target_weight=poids; } }
   else { if(S.selAthleteProfile){ S.selAthleteProfile.goal_detail=arr; S.selAthleteProfile.main_goal=disc; if(poids!=null)S.selAthleteProfile.target_weight=poids; } if(S.selAthlete)S.selAthlete.main_goal=disc; }
+}
+var CORE_EXOS=[['Gainage planche','3 × 30–45 s'],['Gainage latéral','2 × 20 s / côté'],['Relevés de jambes','3 × 12'],['Crunch (enroulé)','3 × 15'],['Hollow hold','3 × 20 s'],['Mountain climbers','3 × 20']];
+var STRETCHES=[['Ischio-jambiers (assis)',40],['Quadriceps (debout)',40],['Fessiers (figure 4)',40],['Mollets au mur',40],['Pectoraux (cadre de porte)',30],['Dos (posture de l\'enfant)',40],['Épaules (bras croisé)',30],['Hanches (fente basse)',40],['Adducteurs (papillon)',40]];
+var MOBILITY=[['Rotations d\'épaules',30],['Cercles de hanches',30],['Cat-cow (dos rond / dos creux)',40],['Rotations thoraciques',40],['Balancement de jambes',30],['Cercles de chevilles',30],['Fente avec rotation',40],['Squat profond tenu',45]];
+function coreBlock(){
+  var rows=CORE_EXOS.slice(0,4).map(function(x){ return '<label class="ex" style="cursor:pointer;align-items:center"><input type="checkbox" style="width:18px;height:18px;accent-color:var(--accent);flex:0 0 auto"><div class="m"><div class="nm">'+esc(x[0])+'</div><div class="ds">'+esc(x[1])+'</div></div></label>'; }).join('');
+  return '<div class="card"><div class="label" style="color:var(--accent);margin-bottom:4px"><i class="ti ti-flame" style="vertical-align:-2px"></i> Abdos & gainage (2–5 min)</div><div class="sub" style="margin-bottom:6px">À faire en fin de séance — coche au fur et à mesure. Au poids du corps : valable avec ou sans matériel.</div>'+rows+'</div>';
+}
+function setFin(k,v){ S.finisher=S.finisher||{type:'deux',mins:10}; S.finisher[k]=v; render(); }
+function finisherRoutine(){
+  var f=S.finisher||{type:'deux',mins:10}; var pool=[];
+  if(f.type==='etir'||f.type==='deux') pool=pool.concat(STRETCHES.map(function(x){return {n:x[0],s:x[1],k:'Étirement'};}));
+  if(f.type==='mob'||f.type==='deux') pool=pool.concat(MOBILITY.map(function(x){return {n:x[0],s:x[1],k:'Mobilité'};}));
+  if(!pool.length) return [];
+  var target=(f.mins||10)*60; var out=[]; var t=0; var i=0;
+  while(t<target){ var m=pool[i%pool.length]; out.push(m); t+=m.s; i++; if(i>60) break; }
+  return out;
+}
+function finisherBlock(){
+  var f=S.finisher||{type:'deux',mins:10};
+  var seg='<div class="seg" style="margin:0"><button class="'+(f.type==='etir'?'on':'')+'" onclick="setFin(\'type\',\'etir\')">Étirements</button><button class="'+(f.type==='mob'?'on':'')+'" onclick="setFin(\'type\',\'mob\')">Mobilité</button><button class="'+(f.type==='deux'?'on':'')+'" onclick="setFin(\'type\',\'deux\')">Les deux</button></div>';
+  var dur='<div class="seg" style="margin:8px 0 0"><button class="'+(f.mins===5?'on':'')+'" onclick="setFin(\'mins\',5)">5 min</button><button class="'+(f.mins===10?'on':'')+'" onclick="setFin(\'mins\',10)">10 min</button><button class="'+(f.mins===15?'on':'')+'" onclick="setFin(\'mins\',15)">15 min</button></div>';
+  var routine=finisherRoutine();
+  var rows=routine.map(function(m){ return '<div class="ex" style="align-items:center"><div class="m"><div class="nm">'+esc(m.n)+'</div><div class="ds">'+m.k+'</div></div><span style="font-weight:700;font-size:13px;color:var(--accent)">'+m.s+' s</span></div>'; }).join('');
+  return '<div class="card"><div class="label" style="color:var(--accent);margin-bottom:6px"><i class="ti ti-stretching" style="vertical-align:-2px"></i> Fin de séance : récupération</div><div class="sub" style="margin-bottom:8px">Choisis ce que tu veux, et le temps qu\'il te reste :</div>'+seg+dur+'<div style="margin-top:10px">'+rows+'</div><div class="sub" style="font-size:11px;margin-top:6px">Enchaîne les mouvements dans l\'ordre, en respirant lentement et sans à-coups.</div></div>';
 }
 var TIMER={mode:null, id:null, remaining:0, elapsed:0, running:false, total:0};
 function timerEl(){ var e=document.getElementById('timerbar'); if(!e){ e=document.createElement('div'); e.id='timerbar'; e.style.cssText='position:fixed;left:0;right:0;bottom:72px;z-index:70;display:none;justify-content:center;pointer-events:none'; document.body.appendChild(e); } return e; }
