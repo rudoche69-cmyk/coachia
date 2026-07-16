@@ -165,13 +165,14 @@ async function loadAll(){
   try{ await db.from('leaderboard_points').upsert({athlete_id:uid, first_name:(prof&&prof.first_name)||'Athlète', points:computePoints(), updated_at:new Date().toISOString()}, {onConflict:'athlete_id'}); }catch(_){}
   try{ const tr=await db.from('fitness_tests').select('*').eq('athlete_id',uid).order('date',{ascending:false}).limit(100); S.tests=tr.data||[]; }catch(_){ S.tests=[]; }
   S.athletes=[];
-  if(S.profile && S.profile.role==='admin'){ try{ const ar = await db.from('profiles').select('id,first_name,last_name,main_goal').neq('id',uid).order('first_name',{ascending:true}); const sr = await db.from('fitness_scores').select('athlete_id,level,score,date').order('date',{ascending:false}).limit(500); const latest={}; (sr.data||[]).forEach(function(r){ if(!latest[r.athlete_id]) latest[r.athlete_id]=r; }); S.athletes=(ar.data||[]).map(function(a){ a.score=latest[a.id]||null; return a; }); }catch(_){ S.athletes=[]; }
+  if(S.profile && S.profile.role==='admin'){ try{ const ar = await db.from('profiles').select('id,first_name,last_name,main_goal,team').neq('id',uid).order('first_name',{ascending:true}); const sr = await db.from('fitness_scores').select('athlete_id,level,score,date').order('date',{ascending:false}).limit(500); const latest={}; (sr.data||[]).forEach(function(r){ if(!latest[r.athlete_id]) latest[r.athlete_id]=r; }); S.athletes=(ar.data||[]).map(function(a){ a.score=latest[a.id]||null; return a; }); }catch(_){ S.athletes=[]; }
     try{ var aids=S.athletes.map(function(a){return a.id;}); if(aids.length){
       var ck=await db.from('daily_checkins').select('athlete_id,date,fatigue,sleep,pain,motivation,stress').in('athlete_id',aids).order('date',{ascending:false}).limit(2000);
       var lcm={}; (ck.data||[]).forEach(function(r){ if(!lcm[r.athlete_id]) lcm[r.athlete_id]=r; });
       var twm={}; try{ var tw=await db.from('workouts').select('athlete_id,status').eq('date',today()).in('athlete_id',aids); (tw.data||[]).forEach(function(r){ if(!twm[r.athlete_id]) twm[r.athlete_id]=r.status||'prevue'; }); }catch(_){}
       S.athletes.forEach(function(a){ a.lastCheckin=lcm[a.id]||null; a.todayWorkout=twm[a.id]||null; });
     } }catch(_){}
+    S.teams=(S.profile&&Array.isArray(S.profile.teams))?S.profile.teams:[];
   }
 }
 async function saveCheckin(c){
@@ -404,14 +405,36 @@ async function openWorkout(id){
   try{ var r=await db.from('workout_exercises').select('*').eq('workout_id',id).order('position',{ascending:true}); S.exercises=r.data||[]; }catch(_){ S.exercises=[]; }
   S.started=(S.workout&&S.workout.status==='realisee'); S.screen='workout'; render();
 }
+function allTeams(){ var set={}; (S.teams||[]).forEach(function(t){ if(t) set[t]=1; }); (S.athletes||[]).forEach(function(a){ if(a.team) set[a.team]=1; }); return Object.keys(set).sort(); }
+function teamOpts(){ return allTeams().map(function(t){ return [t,t]; }); }
+async function saveTeams(){ try{ await db.from('profiles').update({teams:S.teams||[]}).eq('id',S.user.id); if(S.profile)S.profile.teams=S.teams; }catch(_){} }
+function setCoachTeam(t){ S.coachTeam=t||null; render(); }
+function setCoachTeamIdx(i){ var teams=allTeams(); S.coachTeam=(i===-1?null:(i===-2?'__none__':(teams[i]||null))); render(); }
+function openTeams(){ S.screen='teams'; render(); }
+async function doAddTeam(){ var e=document.getElementById('tm-name'); var n=e?e.value.trim():''; if(!n){ return; } S.teams=S.teams||[]; if(S.teams.indexOf(n)<0 && allTeams().indexOf(n)<0){ S.teams.push(n); await saveTeams(); S.msg={k:'ok',t:'Équipe « '+n+' » créée.'}; } else { S.msg={k:'err',t:'Cette équipe existe déjà.'}; } render(); }
+async function doDeleteTeam(name){ if(!confirm('Supprimer l\'équipe « '+name+' » ? Les athlètes seront remis « sans équipe ».')) return; S.teams=(S.teams||[]).filter(function(t){return t!==name;}); try{ await db.from('profiles').update({team:null}).eq('team',name); }catch(_){} (S.athletes||[]).forEach(function(a){ if(a.team===name)a.team=null; }); if(S.coachTeam===name)S.coachTeam=null; await saveTeams(); S.msg={k:'ok',t:'Équipe supprimée.'}; render(); }
+function scrTeams(){
+  var tb='<div class="tbar"><button class="ic" onclick="go(\'coach\')"><i class="ti ti-chevron-left"></i></button><h2 style="font-size:19px">Mes équipes</h2><span style="width:38px"></span></div>';
+  var msg=S.msg?'<div class="msg '+S.msg.k+'">'+S.msg.t+'</div>':'';
+  var teams=allTeams(); var counts={}; (S.athletes||[]).forEach(function(a){ if(a.team) counts[a.team]=(counts[a.team]||0)+1; });
+  var noTeam=(S.athletes||[]).filter(function(a){return !a.team;}).length;
+  var rows=teams.length?teams.map(function(t){ var tq=String(t).replace(/[\\']/g,''); return '<div class="ath"><div class="m"><div class="nm">'+esc(t)+'</div><div class="ds">'+(counts[t]||0)+' athlète(s)</div></div><span onclick="doDeleteTeam(\''+tq+'\')" style="color:var(--red);cursor:pointer;padding:8px"><i class="ti ti-trash"></i></span></div>'; }).join(''):'<div class="sub" style="padding:10px 2px">Aucune équipe pour l\'instant.</div>';
+  return tb+msg+'<div class="banner" style="background:var(--accent-soft)"><i class="ti ti-users-group" style="color:var(--accent)"></i><div class="x" style="color:#1742a5">Crée des équipes (Team Foot, Team Muscu…) et affecte tes athlètes lors de la création ou dans leur profil. Ton tableau de bord se filtre ensuite par équipe.</div></div>'+'<div class="card"><div class="flabel">Nouvelle équipe</div><div class="row" style="gap:8px;margin-top:6px"><input id="tm-name" class="in" type="text" placeholder="ex : Team Foot" style="margin-top:0"><button class="btn" style="width:auto;margin:0;padding:13px 16px" onclick="doAddTeam()">Ajouter</button></div></div>'+'<div class="label" style="margin:12px 2px 8px">Équipes ('+teams.length+')</div><div class="card" style="padding:4px 14px">'+rows+'</div>'+'<div class="sub" style="margin-top:10px">Sans équipe : '+noTeam+' athlète(s)</div>';
+}
 function scrCoach(){
-  var a=S.athletes||[];
+  var all=S.athletes||[]; var teams=allTeams(); var sel=S.coachTeam||null;
+  var a=all.filter(function(x){ if(!sel) return true; if(sel==='__none__') return !x.team; return x.team===sel; });
   var tb='<div class="tbar"><button class="ic" onclick="go(\'dash\')"><i class="ti ti-chevron-left"></i></button><h2 style="font-size:19px">Tableau de bord</h2><span style="width:38px"></span></div>';
   var msg=S.msg?'<div class="msg '+S.msg.k+'">'+S.msg.t+'</div>':'';
   var createBtn='<button class="btn" onclick="go(\'newathlete\')" style="margin-bottom:13px"><i class="ti ti-user-plus"></i> Créer un compte athlète</button>';
   var grpBtn='<button class="btn outline" onclick="go(\'groupsession\')" style="margin-bottom:13px"><i class="ti ti-users-group"></i> Séance de groupe (synchronisée)</button>';
+  var manageBtn='<button class="btn outline" onclick="openTeams()" style="margin-bottom:13px"><i class="ti ti-users-group"></i> Gérer les équipes</button>';
+  var teamBar='';
+  if(teams.length){ var chip=function(lab,idx,active){ return '<button onclick="setCoachTeamIdx('+idx+')" style="flex:0 0 auto;padding:7px 13px;border-radius:20px;border:1px solid '+(active?'var(--accent)':'var(--line)')+';background:'+(active?'var(--accent)':'var(--bg)')+';color:'+(active?'#fff':'var(--ink)')+';font:inherit;font-size:12px;font-weight:700;cursor:pointer">'+esc(lab)+'</button>'; };
+    teamBar='<div style="display:flex;gap:6px;overflow-x:auto;margin-bottom:12px;padding-bottom:2px">'+chip('Toutes',-1,!sel)+teams.map(function(t,i){return chip(t,i,sel===t);}).join('')+chip('Sans équipe',-2,sel==='__none__')+'</div>'; }
   function lv(x){ return x&&x.score?x.score.level:null; }
-  if(!a.length) return tb+msg+createBtn+'<div class="card flat" style="text-align:center;padding:26px 16px"><i class="ti ti-users" style="font-size:34px;color:var(--faint)"></i><div style="font-weight:700;margin:10px 0 4px">Aucun athlète</div><div class="sub">Crée le compte d\'un athlète avec le bouton ci-dessus : il apparaîtra ici avec son suivi.</div></div>';
+  if(!all.length) return tb+msg+createBtn+manageBtn+'<div class="card flat" style="text-align:center;padding:26px 16px"><i class="ti ti-users" style="font-size:34px;color:var(--faint)"></i><div style="font-weight:700;margin:10px 0 4px">Aucun athlète</div><div class="sub">Crée le compte d\'un athlète avec le bouton ci-dessus : il apparaîtra ici avec son suivi.</div></div>';
+  if(!a.length) return tb+msg+createBtn+grpBtn+manageBtn+teamBar+'<div class="card flat" style="text-align:center;padding:22px 16px"><div class="sub">Aucun athlète dans cette équipe.</div></div>';
   var g=a.filter(function(x){return lv(x)==='vert';}).length,o=a.filter(function(x){return lv(x)==='orange';}).length,r=a.filter(function(x){return lv(x)==='rouge';}).length;
   var counts='<div class="row" style="gap:8px;margin-bottom:12px"><div class="card flat" style="flex:1;margin:0;text-align:center;padding:11px"><div class="big" style="font-size:21px;color:var(--green)">'+g+'</div><div class="label">Au vert</div></div><div class="card flat" style="flex:1;margin:0;text-align:center;padding:11px"><div class="big" style="font-size:21px;color:var(--amber)">'+o+'</div><div class="label">Vigilance</div></div><div class="card flat" style="flex:1;margin:0;text-align:center;padding:11px"><div class="big" style="font-size:21px;color:var(--red)">'+r+'</div><div class="label">À risque</div></div></div>';
   var withAl=a.map(function(x){ return {x:x, al:athleteAlerts(x)}; }).filter(function(o){ return o.al.length; });
@@ -436,9 +459,10 @@ function scrCoach(){
     if(lc){ var dsc=daysSince(lc.date); sub='Check-in '+(dsc<=0?'aujourd\'hui':(dsc===1?'hier':'il y a '+dsc+' j'))+' · fatigue '+(lc.fatigue!=null?lc.fatigue+'/10':'—'); }
     else sub='Aucun check-in';
     var nAl=athleteAlerts(x).length; var badge=nAl?'<span style="font-size:10px;font-weight:700;color:var(--red);background:var(--red-bg);padding:1px 6px;border-radius:20px;margin-right:6px">'+nAl+'</span>':'';
-    return '<div class="ath" onclick="openAthlete(\''+x.id+'\')" style="cursor:pointer"><div class="av">'+esc(init)+'</div><div class="m"><div class="nm">'+esc(((x.first_name||'')+' '+(x.last_name||'')).trim()||'Athlète')+'</div><div class="ds">'+esc(sub)+'</div></div>'+badge+dot+'</div>';
+    var tchip=x.team?' <span style="font-size:9px;font-weight:700;color:var(--accent);background:var(--accent-soft);padding:1px 6px;border-radius:20px;vertical-align:1px">'+esc(x.team)+'</span>':'';
+    return '<div class="ath" onclick="openAthlete(\''+x.id+'\')" style="cursor:pointer"><div class="av">'+esc(init)+'</div><div class="m"><div class="nm">'+esc(((x.first_name||'')+' '+(x.last_name||'')).trim()||'Athlète')+tchip+'</div><div class="ds">'+esc(sub)+'</div></div>'+badge+dot+'</div>';
   }).join('');
-  return tb+msg+createBtn+grpBtn+counts+alertSec+'<div class="label" style="margin:4px 0 7px">TOUS LES ATHLÈTES ('+a.length+')</div><div class="card" style="padding:4px 14px">'+rows+'</div>';
+  return tb+msg+createBtn+grpBtn+manageBtn+teamBar+counts+alertSec+'<div class="label" style="margin:4px 0 7px">'+(sel&&sel!=='__none__'?esc(sel).toUpperCase():(sel==='__none__'?'SANS ÉQUIPE':'TOUS LES ATHLÈTES'))+' ('+a.length+')</div><div class="card" style="padding:4px 14px">'+rows+'</div>';
 }
 function scrGroupSession(){
   var tb='<div class="tbar"><button class="ic" onclick="go(\'coach\')"><i class="ti ti-chevron-left"></i></button><h2 style="font-size:19px">Séance de groupe</h2><span style="width:38px"></span></div>';
@@ -557,11 +581,12 @@ function scrNewAthlete(){
     inField('na-last','Nom',null,'text','Nom (optionnel)')+
     inField('na-pseudo','Pseudo (identifiant de connexion)',null,'text','ex : lea.martin')+
     inField('na-pass','Mot de passe provisoire',null,'text','au moins 6 caractères')+
+    selField('na-team','Équipe (optionnel)',null,teamOpts())+
     '<button class="btn" id="b-na" onclick="doCreateAthlete()"><i class="ti ti-user-plus"></i> Créer le compte</button>';
 }
 async function doCreateAthlete(){
   var g=function(id){var e=document.getElementById(id);return e?e.value.trim():'';};
-  var first=g('na-first'), last=g('na-last'), pseudo=g('na-pseudo'), pass=g('na-pass');
+  var first=g('na-first'), last=g('na-last'), pseudo=g('na-pseudo'), pass=g('na-pass'), team=g('na-team');
   var pc=pseudoClean(pseudo);
   if(!pc||!pass){ S.msg={k:'err',t:'Le pseudo et le mot de passe sont obligatoires.'}; render(); return; }
   if(pc.length<3){ S.msg={k:'err',t:'Le pseudo doit faire au moins 3 caractères (lettres, chiffres, . _ -).'}; render(); return; }
@@ -573,6 +598,7 @@ async function doCreateAthlete(){
     var r=await invokeFn('admin-create-athlete',payload);
     if(r.error){ r=await invokeFn('super-function',payload); }
     if(r.error||(r.data&&r.data.error)){ var d=(r.data&&r.data.error)||(r.error&&r.error.message)||'erreur'; if(/already|exist|registered|duplicate/i.test(d)) d='ce pseudo est déjà pris, choisis-en un autre.'; S.msg={k:'err',t:'Création impossible : '+d}; render(); return; }
+    var newId=(r.data&&(r.data.athlete_id||r.data.id))||null; if(newId && team){ try{ await db.from('profiles').update({team:team}).eq('id',newId); }catch(_){} }
     await loadAll(); S.msg={k:'ok',t:'Compte créé ✅ À transmettre — pseudo : '+pc+' · mot de passe : '+pass}; S.screen='coach'; render();
   }catch(e){ S.msg={k:'err',t:'Erreur : '+(e.message||e)}; render(); }
 }
@@ -589,17 +615,19 @@ function scrAthleteEdit(){
     selField('ae-equip','Matériel disponible',p.available_equipment,[['Salle de sport complète','Salle de sport complète'],['Salle de sport (basique)','Salle de sport (basique)'],['Matériel maison (haltères/barre)','Matériel maison (haltères/barre)'],['Petit matériel (élastiques, kettlebell)','Petit matériel (élastiques, kettlebell)'],['Sans matériel (poids du corps)','Sans matériel (poids du corps)']])+
     inField('ae-dur','Durée par séance (min)',p.session_duration_min,'number','60')+
     inField('ae-injuries','Blessures / restrictions',p.injuries_current,'text','Aucune, genou droit…')+
+    selField('ae-team','Équipe',p.team,teamOpts())+
     '<button class="btn" id="b-ae" onclick="doSaveAthleteProfile()"><i class="ti ti-check"></i> Enregistrer</button>';
 }
 async function doSaveAthleteProfile(){
   if(!S.selAthlete) return;
   var g=function(id){var e=document.getElementById(id);return e?e.value.trim():'';};
-  var upd={ first_name:g('ae-first')||null, sport_level:g('ae-level')||null, available_equipment:g('ae-equip')||null, session_duration_min:parseInt(g('ae-dur'))||null, injuries_current:g('ae-injuries')||null };
+  var upd={ first_name:g('ae-first')||null, sport_level:g('ae-level')||null, available_equipment:g('ae-equip')||null, session_duration_min:parseInt(g('ae-dur'))||null, injuries_current:g('ae-injuries')||null, team:g('ae-team')||null };
   var btn=document.getElementById('b-ae'); if(btn){ btn.disabled=true; btn.innerHTML='<span class="spin"></span>'; }
   try{
     var r=await db.from('profiles').update(upd).eq('id',S.selAthlete.id);
     if(r.error){ S.msg={k:'err',t:'Erreur : '+r.error.message}; render(); return; }
     try{ var pr=await db.from('profiles').select('*').eq('id',S.selAthlete.id).maybeSingle(); S.selAthleteProfile=pr.data||S.selAthleteProfile; }catch(_){}
+    if(S.selAthlete){ S.selAthlete.team=upd.team; } (S.athletes||[]).forEach(function(x){ if(S.selAthlete&&x.id===S.selAthlete.id) x.team=upd.team; });
     S.msg={k:'ok',t:'Profil de l\'athlète enregistré.'}; S.screen='coachDetail'; render();
   }catch(e){ S.msg={k:'err',t:'Erreur : '+(e.message||e)}; render(); }
 }
@@ -1801,7 +1829,7 @@ function render(extra){
   else if(S.screen==='onboarding'){ html=scrOnboarding(); nav.style.display='none'; }
   else if(S.screen==='result'){ html=scrResult(extra); nav.style.display='flex'; nav.innerHTML=navBar(); }
   else { nav.style.display='flex'; nav.innerHTML=navBar();
-    html = S.screen==='checkin'?scrCheckin():(S.screen==='workout'?scrWorkout():(S.screen==='profile'?scrProfile():(S.screen==='genopts'?scrGenOptions():(S.screen==='charges'?scrCharges():(S.screen==='calendar'?scrCalendar():(S.screen==='coach'?scrCoach():(S.screen==='coachDetail'?scrCoachDetail():(S.screen==='nutrition'?scrNutrition():(S.screen==='runs'?scrRuns():(S.screen==='badges'?scrBadges():(S.screen==='feedback'?scrFeedback():(S.screen==='comps'?scrComps():(S.screen==='assistant'?scrAssistant():(S.screen==='report'?scrReport():(S.screen==='runplanopts'?scrRunPlanOpts():(S.screen==='runsession'?scrRunSession():(S.screen==='newathlete'?scrNewAthlete():(S.screen==='athleteEdit'?scrAthleteEdit():(S.screen==='muscu'?scrMuscu():(S.screen==='muscuopts'?scrMuscuOpts():(S.screen==='muscuday'?scrMuscuDay():(S.screen==='exodetail'?scrExoDetail():(S.screen==='leaderboard'?scrLeaderboard():(S.screen==='groupsession'?scrGroupSession():(S.screen==='programopts'?scrProgramOpts():(S.screen==='tests'?scrTests():(S.screen==='goals'?scrGoals():(S.screen==='goaledit'?scrGoalEdit():(S.screen==='records'?scrRecords():scrDash())))))))))))))))))))))))))))));
+    html = S.screen==='checkin'?scrCheckin():(S.screen==='workout'?scrWorkout():(S.screen==='profile'?scrProfile():(S.screen==='genopts'?scrGenOptions():(S.screen==='charges'?scrCharges():(S.screen==='calendar'?scrCalendar():(S.screen==='coach'?scrCoach():(S.screen==='coachDetail'?scrCoachDetail():(S.screen==='nutrition'?scrNutrition():(S.screen==='runs'?scrRuns():(S.screen==='badges'?scrBadges():(S.screen==='feedback'?scrFeedback():(S.screen==='comps'?scrComps():(S.screen==='assistant'?scrAssistant():(S.screen==='report'?scrReport():(S.screen==='runplanopts'?scrRunPlanOpts():(S.screen==='runsession'?scrRunSession():(S.screen==='newathlete'?scrNewAthlete():(S.screen==='athleteEdit'?scrAthleteEdit():(S.screen==='muscu'?scrMuscu():(S.screen==='muscuopts'?scrMuscuOpts():(S.screen==='muscuday'?scrMuscuDay():(S.screen==='exodetail'?scrExoDetail():(S.screen==='leaderboard'?scrLeaderboard():(S.screen==='groupsession'?scrGroupSession():(S.screen==='programopts'?scrProgramOpts():(S.screen==='tests'?scrTests():(S.screen==='goals'?scrGoals():(S.screen==='goaledit'?scrGoalEdit():(S.screen==='records'?scrRecords():(S.screen==='teams'?scrTeams():scrDash()))))))))))))))))))))))))))))));
   }
   sc.innerHTML=html; sc.scrollTop=0; S.msg=null;
   const e=document.getElementById('i-email'); if(e) e.addEventListener('keydown',ev=>{if(ev.key==='Enter')document.getElementById('i-pass').focus();});
