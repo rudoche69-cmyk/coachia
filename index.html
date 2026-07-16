@@ -1639,20 +1639,21 @@ function coreBlock(){
 function setFin(k,v){ S.finisher=S.finisher||{type:'deux',mins:10}; S.finisher[k]=v; render(); }
 function finisherRoutine(){
   var f=S.finisher||{type:'deux',mins:10}; var pool=[];
-  if(f.type==='etir'||f.type==='deux') pool=pool.concat(STRETCHES.map(function(x){return {n:x[0],s:x[1],k:'Étirement'};}));
-  if(f.type==='mob'||f.type==='deux') pool=pool.concat(MOBILITY.map(function(x){return {n:x[0],s:x[1],k:'Mobilité'};}));
+  if(f.type==='etir'||f.type==='deux') pool=pool.concat(STRETCHES.map(function(x){return {n:x[0],k:'Étirement'};}));
+  if(f.type==='mob'||f.type==='deux') pool=pool.concat(MOBILITY.map(function(x){return {n:x[0],k:'Mobilité'};}));
   if(!pool.length) return [];
-  var target=(f.mins||10)*60; var out=[]; var t=0; var i=0;
-  while(t<target){ var m=pool[i%pool.length]; out.push(m); t+=m.s; i++; if(i>60) break; }
-  return out;
+  var mins=f.mins||10; var count=mins<=5?5:(mins<=10?6:8); count=Math.min(count,pool.length);
+  var sel=[]; for(var i=0;i<count;i++){ sel.push(pool[Math.floor(i*pool.length/count)]); }
+  var per=Math.round((mins*60)/count/5)*5; if(per<25)per=25;
+  return sel.map(function(m){ return {n:m.n, k:m.k, s:per}; });
 }
 function finisherBlock(){
   var f=S.finisher||{type:'deux',mins:10};
   var seg='<div class="seg" style="margin:0"><button class="'+(f.type==='etir'?'on':'')+'" onclick="setFin(\'type\',\'etir\')">Étirements</button><button class="'+(f.type==='mob'?'on':'')+'" onclick="setFin(\'type\',\'mob\')">Mobilité</button><button class="'+(f.type==='deux'?'on':'')+'" onclick="setFin(\'type\',\'deux\')">Les deux</button></div>';
   var dur='<div class="seg" style="margin:8px 0 0"><button class="'+(f.mins===5?'on':'')+'" onclick="setFin(\'mins\',5)">5 min</button><button class="'+(f.mins===10?'on':'')+'" onclick="setFin(\'mins\',10)">10 min</button><button class="'+(f.mins===15?'on':'')+'" onclick="setFin(\'mins\',15)">15 min</button></div>';
   var routine=finisherRoutine();
-  var rows=routine.map(function(m){ return '<div class="ex" style="align-items:center"><div class="m"><div class="nm">'+esc(m.n)+'</div><div class="ds">'+m.k+'</div></div><span style="font-weight:700;font-size:13px;color:var(--accent)">'+m.s+' s</span></div>'; }).join('');
-  return '<div class="card"><div class="label" style="color:var(--accent);margin-bottom:6px"><i class="ti ti-stretching" style="vertical-align:-2px"></i> Fin de séance : récupération</div><div class="sub" style="margin-bottom:8px">Choisis ce que tu veux, et le temps qu\'il te reste :</div>'+seg+dur+'<div style="margin-top:10px">'+rows+'</div><div class="sub" style="font-size:11px;margin-top:6px">Enchaîne les mouvements dans l\'ordre, en respirant lentement et sans à-coups.</div></div>';
+  var rows=routine.map(function(m){ var q=esc(m.n).replace(/[^A-Za-zÀ-ÿ0-9 ()\/-]/g,''); return '<div class="ex" style="align-items:center"><div class="m"><div class="nm">'+esc(m.n)+'</div><div class="ds">'+m.k+' · '+m.s+' s</div></div><span onclick="openVideo(\''+q+' étirement mobilité\')" style="color:var(--accent);cursor:pointer;font-weight:700;font-size:12px;white-space:nowrap"><i class="ti ti-brand-youtube" style="vertical-align:-2px"></i> Vidéo</span></div>'; }).join('');
+  return '<div class="card"><div class="label" style="color:var(--accent);margin-bottom:6px"><i class="ti ti-stretching" style="vertical-align:-2px"></i> Fin de séance : récupération</div><div class="sub" style="margin-bottom:8px">Choisis ce que tu veux et le temps qu\'il te reste :</div>'+seg+dur+'<div style="margin-top:10px">'+rows+'</div><div class="sub" style="font-size:11px;margin-top:6px">Enchaîne les mouvements en respirant lentement. Touche « Vidéo » pour voir la bonne exécution.</div></div>';
 }
 var TIMER={mode:null, id:null, remaining:0, elapsed:0, running:false, total:0};
 function timerEl(){ var e=document.getElementById('timerbar'); if(!e){ e=document.createElement('div'); e.id='timerbar'; e.style.cssText='position:fixed;left:0;right:0;bottom:72px;z-index:70;display:none;justify-content:center;pointer-events:none'; document.body.appendChild(e); } return e; }
