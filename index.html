@@ -3,14 +3,14 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover"/>
-<title>CoachIA</title>
+<title>Athlon</title>
 <meta name="theme-color" content="#2E6BFF"/>
 <link rel="manifest" href="manifest.webmanifest"/>
 <link rel="apple-touch-icon" href="icon-192.png"/>
 <meta name="mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
-<meta name="apple-mobile-web-app-title" content="CoachIA"/>
+<meta name="apple-mobile-web-app-title" content="Athlon"/>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/3.24.0/tabler-icons.min.css"/>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
@@ -197,7 +197,7 @@ function weightSVG(rows){
 }
 
 function scrLogin(){
-  return '<div class="login"><div class="logo"><i class="ti ti-bolt"></i></div><h2 style="font-size:24px;font-weight:700;text-align:center">CoachIA</h2><p class="sub" style="text-align:center;margin:7px 0 22px">Connecte-toi à ton espace</p>'+
+  return '<div class="login"><div class="logo"><span style="font-weight:800;font-size:36px;letter-spacing:-1px">A</span></div><h2 style="font-size:26px;font-weight:800;text-align:center;letter-spacing:1px">ATHLON</h2><p class="sub" style="text-align:center;margin:7px 0 22px">Ton coach, ta performance</p>'+
     (S.msg?'<div class="msg '+S.msg.k+'">'+S.msg.t+'</div>':'')+
     '<div class="field"><label>Pseudo</label><input id="i-email" type="text" autocapitalize="none" autocomplete="username" placeholder="ton pseudo"></div>'+
     '<div class="field"><label>Mot de passe</label><input id="i-pass" type="password" autocomplete="current-password" placeholder="••••••••"></div>'+
@@ -863,7 +863,7 @@ async function doExport(){
     var out={};
     for(var i=0;i<tabs.length;i++){ var t=tabs[i]; try{ var q=db.from(t).select('*'); if(t==='profiles') q=q.eq('id',uid); else if(t!=='workout_exercises'&&t!=='meals') q=q.eq('athlete_id',uid); var r=await q; out[t]=r.data||[]; }catch(e){ out[t]='err'; } }
     var blob=new Blob([JSON.stringify(out,null,2)],{type:'application/json'});
-    var url=URL.createObjectURL(blob); var a=document.createElement('a'); a.href=url; a.download='coachia-mes-donnees.json'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    var url=URL.createObjectURL(blob); var a=document.createElement('a'); a.href=url; a.download='athlon-mes-donnees.json'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
     S.msg={k:'ok',t:'Export téléchargé.'};
   }catch(e){ S.msg={k:'err',t:'Erreur export : '+(e.message||e)}; }
   render();
@@ -1451,8 +1451,8 @@ function scrTests(){
   return tb+msg+'<div class="banner" style="background:var(--accent-soft)"><i class="ti ti-clipboard-check" style="color:var(--accent)"></i><div class="x" style="color:#1742a5">Fais ces tests, note tes résultats, et refais-les toutes les 4-6 semaines pour mesurer tes progrès et affiner tes allures / charges.</div></div>'+pftCard+vmaCard+forceCard+physCard;
 }
 var ONB_STEPS=[
-  {ic:'ti-hand-love-you',ti:'Bienvenue sur CoachIA 👋',tx:'Ton coach t\'a créé un espace personnel. En 4 étapes rapides, voici comment t\'en servir.'},
-  {ic:'ti-clipboard-heart',ti:'1. Ton check-in du jour',tx:'Chaque matin, indique ton sommeil, ta fatigue, ton stress. CoachIA calcule ta forme et adapte ta séance en conséquence.'},
+  {ic:'ti-hand-love-you',ti:'Bienvenue sur Athlon 👋',tx:'Ton coach t\'a créé un espace personnel. En 4 étapes rapides, voici comment t\'en servir.'},
+  {ic:'ti-clipboard-heart',ti:'1. Ton check-in du jour',tx:'Chaque matin, indique ton sommeil, ta fatigue, ton stress. Athlon calcule ta forme et adapte ta séance en conséquence.'},
   {ic:'ti-barbell',ti:'2. Ta séance',tx:'Dans l\'onglet Séance, génère ta séance du jour : elle s\'adapte à ton matériel, à ton objectif et à ta forme.'},
   {ic:'ti-help-circle',ti:'3. Un exo que tu ne connais pas ?',tx:'Touche « ⓘ Technique / remplacer » sous un exercice : tu as une explication pas-à-pas, une vidéo, et tu peux le remplacer si la machine est prise.'},
   {ic:'ti-target',ti:'4. Tes objectifs',tx:'Sur l\'accueil, définis tes objectifs (discipline + cible chiffrée). Ta progression et tes paliers se suivent tout seuls.'}
