@@ -1688,6 +1688,12 @@ function startRestFor(i){ var e=(S.exercises||[])[i]; startRest(restSeconds(e&&e
 function startRestMuscu(i){ var d=(S.muscu&&S.muscu.days)?S.muscu.days[S.selMuscuDay]:null; var e=d&&d.exercises?d.exercises[i]:null; startRest(restSeconds((e&&e.rest)||'2 min')); }
 function openMuscuDayFromCal(di){ S.selMuscuDay=di; S.screen='muscuday'; render(); }
 function openRunFromCal(wi,si){ S.selRun={w:wi,s:si}; S.homeRun=false; S.screen='runsession'; render(); }
+function openTodaySession(){
+  var ev=(calEvents()[today()]||[]).filter(function(e){return e.kind==='muscu'||e.kind==='run';});
+  var pick=null; for(var i=0;i<ev.length;i++){ if(!ev[i].done){ pick=ev[i]; break; } } if(!pick && ev.length) pick=ev[0];
+  if(pick){ if(pick.kind==='muscu') openMuscuDayFromCal(pick.di); else openRunFromCal(pick.wi,pick.si); return; }
+  go('workout');
+}
 function todayPlanCard(){
   var ev=(calEvents()[today()]||[]).filter(function(e){ return e.kind==='muscu'||e.kind==='run'; });
   if(!ev.length) return '';
@@ -1784,7 +1790,9 @@ function rpeBlock(ctx){
 function navBar(){
   const b=(ic,t)=>'<button class="'+(S.screen===t?'on':'')+'" onclick="go(\''+t+'\')" style="font-size:11px;font-weight:700;color:inherit;letter-spacing:.02em">'+ic+'</button>';
   var ckDot=(S.user && !S.todayCheckin)?'<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--red);margin-left:4px;vertical-align:middle"></span>':'';
-  return b('Accueil','dash')+b('Séance','workout')+b('Nutrition','nutrition')+b('Check-in'+ckDot,'checkin')+b('Agenda','calendar');
+  var seanceActive=(S.screen==='workout'||S.screen==='muscuday'||S.screen==='runsession')?'on':'';
+  var seanceBtn='<button class="'+seanceActive+'" onclick="openTodaySession()" style="font-size:11px;font-weight:700;color:inherit;letter-spacing:.02em">Séance</button>';
+  return b('Accueil','dash')+seanceBtn+b('Nutrition','nutrition')+b('Check-in'+ckDot,'checkin')+b('Agenda','calendar');
 }
 function render(extra){
   const sc=document.getElementById('screen'), nav=document.getElementById('nav');
@@ -1850,4 +1858,3 @@ async function doGenerate(){
 </script>
 </body>
 </html>
-
