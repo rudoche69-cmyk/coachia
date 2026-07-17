@@ -375,11 +375,13 @@ function scrCalendar(){
     var items=ev[ds]||[];
     var seen={}; var dots='';
     items.forEach(function(it){ if(!seen[it.color]){ seen[it.color]=1; dots+='<span class="dt" style="background:'+it.color+'"></span>'; } });
+    var track=items.filter(function(it){ return it.kind==='workout'||it.kind==='run'||it.kind==='muscu'; });
+    var sym=''; if(track.length){ var allDone=track.every(function(it){ return it.kind==='workout'?(it.status==='realisee'):!!it.done; }); sym='<span style="font-size:12px;line-height:1">'+(allDone?'🙂':'⬜')+'</span>'; }
     var cls='d'+(ds===todayStr?' today':'')+(ds===S.calSel?' sel':'');
-    grid+='<div class="'+cls+'" onclick="calSelectDay(\''+ds+'\')">'+day+'<div class="dots">'+dots+'</div></div>';
+    grid+='<div class="'+cls+'" onclick="calSelectDay(\''+ds+'\')">'+day+'<div class="dots">'+dots+'</div>'+sym+'</div>';
   }
   grid+='</div>';
-  var legend='<div style="margin:14px 2px 4px"><span class="lg"><i style="background:var(--accent)"></i>Muscu / séance</span><span class="lg"><i style="background:var(--green)"></i>Course</span><span class="lg"><i style="background:#8B5CF6"></i>Compétition</span></div>';
+  var legend='<div style="margin:14px 2px 4px"><span class="lg"><i style="background:var(--accent)"></i>Muscu / séance</span><span class="lg"><i style="background:var(--green)"></i>Course</span><span class="lg"><i style="background:#8B5CF6"></i>Compétition</span></div><div class="sub" style="margin:2px 2px 4px;font-size:11px">🙂 séance faite · ⬜ séance à faire</div>';
   var detail='';
   if(S.calSel){
     var its=ev[S.calSel]||[];
@@ -1656,12 +1658,17 @@ async function saveGoals(self, arr){
   if(self){ if(S.profile){ S.profile.goal_detail=arr; S.profile.main_goal=disc; if(poids!=null)S.profile.target_weight=poids; } }
   else { if(S.selAthleteProfile){ S.selAthleteProfile.goal_detail=arr; S.selAthleteProfile.main_goal=disc; if(poids!=null)S.selAthleteProfile.target_weight=poids; } if(S.selAthlete)S.selAthlete.main_goal=disc; }
 }
-var CORE_EXOS=[['Gainage planche','3 × 30–45 s'],['Gainage latéral','2 × 20 s / côté'],['Relevés de jambes','3 × 12'],['Crunch (enroulé)','3 × 15'],['Hollow hold','3 × 20 s'],['Mountain climbers','3 × 20']];
+var CORE_BASE=[['Gainage planche',30],['Gainage latéral droit',20],['Gainage latéral gauche',20],['Relevés de jambes',30],['Hollow hold',25]];
+function coreDone(){ try{ return parseInt(localStorage.getItem('athlon_core_done'))||0; }catch(_){ return 0; } }
+function coreLevel(){ return Math.floor(coreDone()/3); }
+function coreParams(){ var lv=coreLevel(); var bonus=lv*5; var rounds=Math.min(3+lv,6); var rest=Math.max(10,20-lv*2); var exos=CORE_BASE.map(function(e){ return [e[0], e[1]+bonus]; }); return {level:lv, rounds:rounds, rest:rest, exos:exos}; }
+function validateCore(){ var d=coreDone()+1; try{ localStorage.setItem('athlon_core_done',String(d)); }catch(_){} var lv=Math.floor(d/3); if(d%3===0){ S.msg={k:'ok',t:'Séance abdos validée ! Tu passes au niveau '+lv+' 💪 — plus de tours et exercices plus longs.'}; } else { S.msg={k:'ok',t:'Séance abdos validée ! Encore '+(3-(d%3))+' pour monter de niveau.'}; } render(); }
 var STRETCHES=[['Ischio-jambiers (assis)',40],['Quadriceps (debout)',40],['Fessiers (figure 4)',40],['Mollets au mur',40],['Pectoraux (cadre de porte)',30],['Dos (posture de l\'enfant)',40],['Épaules (bras croisé)',30],['Hanches (fente basse)',40],['Adducteurs (papillon)',40]];
 var MOBILITY=[['Rotations d\'épaules',30],['Cercles de hanches',30],['Cat-cow (dos rond / dos creux)',40],['Rotations thoraciques',40],['Balancement de jambes',30],['Cercles de chevilles',30],['Fente avec rotation',40],['Squat profond tenu',45]];
 function coreBlock(){
-  var rows=CORE_EXOS.slice(0,4).map(function(x){ return '<label class="ex" style="cursor:pointer;align-items:center"><input type="checkbox" style="width:18px;height:18px;accent-color:var(--accent);flex:0 0 auto"><div class="m"><div class="nm">'+esc(x[0])+'</div><div class="ds">'+esc(x[1])+'</div></div></label>'; }).join('');
-  return '<div class="card"><div class="label" style="color:var(--accent);margin-bottom:4px"><i class="ti ti-flame" style="vertical-align:-2px"></i> Abdos & gainage (2–5 min)</div><div class="sub" style="margin-bottom:6px">Coche au fur et à mesure, ou lance le chrono guidé. Au poids du corps : valable avec ou sans matériel.</div>'+rows+'<button class="btn outline" onclick="startCoreCircuit()" style="margin-top:9px"><i class="ti ti-player-play"></i> Démarrer en guidé (40 s / exo)</button></div>';
+  var p=coreParams(); var done=coreDone();
+  var rows=p.exos.map(function(e){ var q=esc(e[0]).replace(/[^A-Za-zÀ-ÿ0-9 ()\/-]/g,''); return '<div class="ex" style="align-items:center"><div class="n"><i class="ti ti-flame"></i></div><div class="m"><div class="nm">'+esc(e[0])+'</div><div class="ds">'+e[1]+' s · <span onclick="openVideo(\''+q+'\')" style="color:var(--accent);cursor:pointer;font-weight:700"><i class="ti ti-brand-youtube" style="vertical-align:-2px"></i> Vidéo</span></div></div></div>'; }).join('');
+  return '<div class="card"><div class="row" style="margin-bottom:2px"><div class="label" style="color:var(--accent)"><i class="ti ti-flame" style="vertical-align:-2px"></i> Abdos & gainage — niveau '+p.level+'</div><span class="sub">'+done+' validée(s)</span></div><div class="sub" style="margin-bottom:8px">Séance au temps · <b>'+p.rounds+' tours</b> · repos '+p.rest+' s. Elle se corse à chaque validation.</div>'+rows+'<button class="btn" onclick="startCoreCircuit()" style="margin-top:9px"><i class="ti ti-player-play"></i> Démarrer en guidé ('+p.rounds+' tours)</button><button class="btn outline" onclick="validateCore()" style="margin-top:8px"><i class="ti ti-check"></i> Valider ma séance abdos</button></div>';
 }
 function setFin(k,v){ S.finisher=S.finisher||{type:'deux',mins:10}; S.finisher[k]=v; render(); }
 function finisherRoutine(){
@@ -1735,7 +1742,7 @@ function buildCircuit(hc){ var steps=[]; var R=hc.rounds||1; for(var r=1;r<=R;r+
 function startCircuit(steps){ if(!steps||!steps.length) return; TIMER.mode='circuit'; TIMER.steps=steps; TIMER.idx=0; TIMER.remaining=steps[0].sec; TIMER.running=true; timerInterval(); renderTimer(); timerVibe(30); }
 function timerSkip(){ if(TIMER.mode!=='circuit') return; TIMER.idx++; if(TIMER.idx>=(TIMER.steps||[]).length){ timerStop(); return; } TIMER.remaining=TIMER.steps[TIMER.idx].sec; if(!TIMER.running){ TIMER.running=true; timerInterval(); } renderTimer(); }
 function startRunCircuit(){ var sel=S.selRun; if(!sel||!S.runPlan) return; var s=S.runPlan.weeks[sel.w].sessions[sel.s]; if(!s) return; var hc=homeCardioPlan(s.t); startCircuit(buildCircuit(hc)); }
-function startCoreCircuit(){ var moves=CORE_EXOS.slice(0,4); var steps=[]; moves.forEach(function(m,i){ steps.push({label:m[0],sec:40,kind:'work',round:1}); if(i<moves.length-1) steps.push({label:'Repos',sec:15,kind:'rest',round:1}); }); startCircuit(steps); }
+function startCoreCircuit(){ var p=coreParams(); var steps=[]; for(var r=1;r<=p.rounds;r++){ p.exos.forEach(function(e,i){ steps.push({label:e[0],sec:e[1],kind:'work',round:r}); var last=(r===p.rounds && i===p.exos.length-1); if(!last) steps.push({label:'Repos',sec:p.rest,kind:'rest',round:r}); }); } startCircuit(steps); }
 function startFinisherCircuit(){ var routine=finisherRoutine(); if(!routine.length) return; var steps=routine.map(function(m){ return {label:m.n, sec:m.s, kind:'work', round:1}; }); startCircuit(steps); }
 function startRestMuscu(i){ var d=(S.muscu&&S.muscu.days)?S.muscu.days[S.selMuscuDay]:null; var e=d&&d.exercises?d.exercises[i]:null; startRest(restSeconds((e&&e.rest)||'2 min')); }
 function openMuscuDayFromCal(di){ S.selMuscuDay=di; S.screen='muscuday'; render(); }
