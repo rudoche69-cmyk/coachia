@@ -1044,7 +1044,7 @@ function scrRunSession(){
     tip='<div class="banner" style="background:var(--amber-bg)"><i class="ti ti-bulb" style="color:var(--amber)"></i><div class="x" style="color:#7a4a12"><b>Conseil débutant</b><br><span style="color:var(--ink)">'+esc(base.tip)+'</span></div></div>';
   }
   var btn=s.done?'<div class="banner" style="background:var(--green-bg)"><i class="ti ti-circle-check" style="color:var(--green)"></i><div class="x" style="color:var(--green)"><b>Séance faite — bravo !</b></div></div><button class="btn outline" onclick="doToggleRunDone()">Annuler « faite »</button>':'<button class="btn" onclick="doToggleRunDone()"><i class="ti ti-check"></i> Marquer comme faite</button>';
-  return tb+head+card+tip+homeBtn+btn;
+  return tb+head+card+tip+homeBtn+coreBlock()+finisherBlock()+btn;
 }
 async function doToggleRunDone(){
   var sel=S.selRun; if(!sel||!S.runPlan) return; var s=S.runPlan.weeks[sel.w].sessions[sel.s];
