@@ -1036,8 +1036,8 @@ function scrRunSession(){
   var card, tip;
   if(S.homeRun){
     var hc=homeCardioPlan(s.t);
-    var exRows=hc.ex.map(function(e,i){ var q=esc(e[0]).replace(/[^A-Za-zÀ-ÿ0-9 ()\/-]/g,''); return '<div class="ex" style="align-items:center"><div class="n">'+(i+1)+'</div><div class="m"><div class="nm">'+esc(e[0])+'</div><div class="ds">'+esc(e[1])+(e[2]?' · repos '+e[2]+' s':'')+' · <span onclick="openVideo(\''+q+'\')" style="color:var(--accent);cursor:pointer;font-weight:700"><i class="ti ti-brand-youtube" style="vertical-align:-2px"></i> Vidéo</span></div></div>'+(e[2]?'<span onclick="startRest('+e[2]+')" style="color:var(--accent);cursor:pointer;font-weight:700;font-size:11px;white-space:nowrap"><i class="ti ti-stopwatch" style="vertical-align:-2px"></i> '+e[2]+'s</span>':'')+'</div>'; }).join('');
-    card='<div class="banner" style="background:var(--accent-soft)"><i class="ti ti-home" style="color:var(--accent)"></i><div class="x" style="color:#1742a5"><b>Version maison — '+esc(hc.titre)+' ('+esc(hc.dur)+')</b><br><span style="color:var(--ink)">Équivalent sans sortir, effort comparable.</span></div></div>'+'<div class="card" style="padding:6px 14px">'+block('ti-flame','1. Échauffement',hc.wu)+'</div>'+'<div class="card"><div class="label" style="color:var(--accent);margin-bottom:2px"><i class="ti ti-repeat" style="vertical-align:-2px"></i> 2. Circuit — '+hc.rounds+' tours</div><div class="sub" style="margin-bottom:8px">'+esc(hc.format)+'</div>'+exRows+'</div>'+'<div class="card" style="padding:6px 14px">'+block('ti-stretching','3. Retour au calme',hc.cd)+'</div>';
+    var exRows=hc.ex.map(function(e,i){ var q=esc(e[0]).replace(/[^A-Za-zÀ-ÿ0-9 ()\/-]/g,''); return '<div class="ex" style="align-items:center"><div class="n">'+(i+1)+'</div><div class="m"><div class="nm">'+esc(e[0])+'</div><div class="ds">'+esc(e[1])+(e[2]?' · repos '+e[2]+' s':'')+' · <span onclick="openVideo(\''+q+'\')" style="color:var(--accent);cursor:pointer;font-weight:700"><i class="ti ti-brand-youtube" style="vertical-align:-2px"></i> Vidéo</span></div></div></div>'; }).join('');
+    card='<div class="banner" style="background:var(--accent-soft)"><i class="ti ti-home" style="color:var(--accent)"></i><div class="x" style="color:#1742a5"><b>Version maison — '+esc(hc.titre)+' ('+esc(hc.dur)+')</b><br><span style="color:var(--ink)">Équivalent sans sortir, effort comparable.</span></div></div>'+'<div class="card" style="padding:6px 14px">'+block('ti-flame','1. Échauffement',hc.wu)+'</div>'+'<div class="card"><div class="label" style="color:var(--accent);margin-bottom:2px"><i class="ti ti-repeat" style="vertical-align:-2px"></i> 2. Circuit — '+hc.rounds+' tours</div><div class="sub" style="margin-bottom:8px">'+esc(hc.format)+'</div>'+exRows+'<button class="btn" onclick="startRunCircuit()" style="margin-top:10px"><i class="ti ti-player-play"></i> Démarrer le circuit guidé</button><div class="sub" style="font-size:11px;margin-top:6px">Le chrono enchaîne chaque exercice et chaque repos automatiquement, avec un bip à chaque changement.</div></div>'+'<div class="card" style="padding:6px 14px">'+block('ti-stretching','3. Retour au calme',hc.cd)+'</div>';
     tip='<div class="banner" style="background:var(--amber-bg)"><i class="ti ti-bulb" style="color:var(--amber)"></i><div class="x" style="color:#7a4a12"><b>Adapte à ta forme</b><br><span style="color:var(--ink)">'+esc(hc.note)+'</span></div></div>';
   } else {
     card='<div class="card" style="padding:6px 14px">'+block('ti-flame','1. Échauffement',base.wu)+block('ti-run','2. La séance',s.m)+block('ti-stretching','3. Retour au calme',base.cd)+'</div>';
@@ -1692,6 +1692,15 @@ function renderTimer(){
   var e=timerEl();
   if(!TIMER.mode){ e.style.display='none'; e.innerHTML=''; return; }
   var time, label, col, btns;
+  if(TIMER.mode==='circuit'){
+    var st=(TIMER.steps||[])[TIMER.idx]||{label:'—',sec:0,kind:'work'}; var isRest=st.kind==='rest';
+    time=fmtClock(TIMER.remaining); label=isRest?'REPOS':'EXERCICE'; col=isRest?'var(--amber)':'var(--accent)';
+    var nx=(TIMER.steps||[])[TIMER.idx+1]; var sub=esc(st.label)+(st.round?' · tour '+st.round:'')+(nx?' → puis '+esc(nx.label):' · dernier !');
+    btns=tbtn(TIMER.running?'Pause':'▶','timerToggle()')+tbtn('Passer','timerSkip()')+tbtn('✕','timerStop()');
+    e.style.display='flex';
+    e.innerHTML='<div style="pointer-events:auto;background:var(--card);border:1px solid var(--line);box-shadow:0 8px 26px rgba(0,0,0,.18);border-radius:16px;padding:9px 13px;min-width:270px;max-width:92vw"><div style="display:flex;align-items:center;gap:12px"><div style="display:flex;flex-direction:column;align-items:center;min-width:64px"><span style="font-size:9px;font-weight:800;letter-spacing:.06em;color:'+col+'">'+label+'</span><span style="font-weight:800;font-size:26px;color:'+col+';line-height:1">'+time+'</span></div><div style="flex:1;font-size:12px;font-weight:600;color:var(--ink);line-height:1.3">'+sub+'</div></div><div style="display:flex;gap:6px;margin-top:8px;justify-content:flex-end">'+btns+'</div></div>';
+    return;
+  }
   if(TIMER.mode==='rest'){ time=fmtClock(TIMER.remaining); label='Repos'; col=TIMER.remaining<=0?'var(--red)':'var(--accent)'; btns=tbtn(TIMER.running?'Pause':'▶',TIMER.running?'timerToggle()':'timerToggle()')+tbtn('+15s','timerAdd(15)')+tbtn('↺','timerReset()')+tbtn('✕','timerStop()'); }
   else { time=fmtClock(TIMER.elapsed); label='Chrono'; col='var(--ink)'; btns=tbtn(TIMER.running?'Pause':'▶','timerToggle()')+tbtn('↺','timerReset()')+tbtn('✕','timerStop()'); }
   e.style.display='flex';
@@ -1699,6 +1708,15 @@ function renderTimer(){
 }
 function timerTick(){
   if(!TIMER.running) return;
+  if(TIMER.mode==='circuit'){
+    TIMER.remaining-=1;
+    if(TIMER.remaining<=0){
+      timerBeep(); timerVibe([150,80,150]); TIMER.idx++;
+      if(TIMER.idx>=(TIMER.steps||[]).length){ TIMER.running=false; if(TIMER.id){clearInterval(TIMER.id);TIMER.id=null;} setTimeout(timerBeep,250); TIMER.mode=null; renderTimer(); return; }
+      TIMER.remaining=TIMER.steps[TIMER.idx].sec;
+    }
+    renderTimer(); return;
+  }
   if(TIMER.mode==='rest'){ TIMER.remaining-=1; if(TIMER.remaining<=0){ TIMER.remaining=0; TIMER.running=false; if(TIMER.id){clearInterval(TIMER.id);TIMER.id=null;} timerBeep(); timerVibe([200,100,200]); } }
   else { TIMER.elapsed+=1; }
   renderTimer();
@@ -1712,6 +1730,11 @@ function timerReset(){ if(TIMER.mode==='stop'){ TIMER.elapsed=0; } else if(TIMER
 function timerStop(){ TIMER.mode=null; TIMER.running=false; if(TIMER.id){ clearInterval(TIMER.id); TIMER.id=null; } renderTimer(); }
 function restSeconds(str){ if(!str) return 90; str=String(str).toLowerCase(); var m; if((m=str.match(/(\d+)\s*min(?:\s*(\d+))?/))){ return parseInt(m[1])*60+(m[2]?parseInt(m[2]):0); } if((m=str.match(/(\d+)\s*[:’'](\d+)/))){ return parseInt(m[1])*60+parseInt(m[2]); } if((m=str.match(/(\d+)\s*s/))){ return parseInt(m[1]); } if((m=str.match(/(\d+)/))){ var n=parseInt(m[1]); return n<10?n*60:n; } return 90; }
 function startRestFor(i){ var e=(S.exercises||[])[i]; startRest(restSeconds(e&&e.rest)); }
+function doseSeconds(str){ if(!str) return 0; str=String(str).toLowerCase(); var m; if((m=str.match(/(\d+)\s*min(?:\s*(\d+))?/))) return parseInt(m[1])*60+(m[2]?parseInt(m[2]):0); if((m=str.match(/(\d+)\s*s/))) return parseInt(m[1]); if((m=str.match(/(\d+)/))) return parseInt(m[1]); return 0; }
+function buildCircuit(hc){ var steps=[]; var R=hc.rounds||1; for(var r=1;r<=R;r++){ (hc.ex||[]).forEach(function(e){ var w=doseSeconds(e[1]); if(w>0) steps.push({label:e[0],sec:w,kind:'work',round:r}); var rest=e[2]||0; if(rest>0) steps.push({label:'Repos',sec:rest,kind:'rest',round:r}); }); } return steps; }
+function startCircuit(steps){ if(!steps||!steps.length) return; TIMER.mode='circuit'; TIMER.steps=steps; TIMER.idx=0; TIMER.remaining=steps[0].sec; TIMER.running=true; timerInterval(); renderTimer(); timerVibe(30); }
+function timerSkip(){ if(TIMER.mode!=='circuit') return; TIMER.idx++; if(TIMER.idx>=(TIMER.steps||[]).length){ timerStop(); return; } TIMER.remaining=TIMER.steps[TIMER.idx].sec; if(!TIMER.running){ TIMER.running=true; timerInterval(); } renderTimer(); }
+function startRunCircuit(){ var sel=S.selRun; if(!sel||!S.runPlan) return; var s=S.runPlan.weeks[sel.w].sessions[sel.s]; if(!s) return; var hc=homeCardioPlan(s.t); startCircuit(buildCircuit(hc)); }
 function startRestMuscu(i){ var d=(S.muscu&&S.muscu.days)?S.muscu.days[S.selMuscuDay]:null; var e=d&&d.exercises?d.exercises[i]:null; startRest(restSeconds((e&&e.rest)||'2 min')); }
 function openMuscuDayFromCal(di){ S.selMuscuDay=di; S.screen='muscuday'; render(); }
 function openRunFromCal(wi,si){ S.selRun={w:wi,s:si}; S.homeRun=false; S.screen='runsession'; render(); }
