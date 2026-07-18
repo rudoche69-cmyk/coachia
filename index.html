@@ -250,7 +250,7 @@ function scrDash(){
   }
   const w = S.weights; const lastW = w.length ? Number(w[w.length-1].weight).toFixed(1)+' kg' : '—';
   return '<div class="tbar"><div><div class="t">'+new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'})+'</div><h2>Bonjour, '+esc(displayName())+'</h2></div><button class="ic" onclick="go(\'profile\')" title="Mon profil"><i class="ti ti-user"></i></button></div>'+
-    (S.offline?'<div class="banner" style="background:var(--amber-bg)"><i class="ti ti-wifi-off" style="color:var(--amber)"></i><div class="x" style="color:#7a4a12">Mode hors-ligne — voici les données de ta dernière connexion. Reconnecte-toi pour synchroniser.</div></div>':'')+topAlert()+streakCard()+coachEntryCard()+checkinBlock()+heroCard()+'<button class="btn outline" onclick="toggleTools()" style="margin-top:2px"><i class="ti '+(S.showTools?'ti-chevron-up':'ti-layout-grid')+'"></i> '+(S.showTools?'Masquer les outils':'Tous mes outils')+'</button>'+toolsBlock();
+    (S.offline?'<div class="banner" style="background:var(--amber-bg)"><i class="ti ti-wifi-off" style="color:var(--amber)"></i><div class="x" style="color:#7a4a12">Mode hors-ligne — voici les données de ta dernière connexion. Reconnecte-toi pour synchroniser.</div></div>':'')+topAlert()+coachNoteCard()+streakCard()+coachEntryCard()+checkinBlock()+heroCard()+'<button class="btn outline" onclick="toggleTools()" style="margin-top:2px"><i class="ti '+(S.showTools?'ti-chevron-up':'ti-layout-grid')+'"></i> '+(S.showTools?'Masquer les outils':'Tous mes outils')+'</button>'+toolsBlock();
 }
 function scrWorkout(){
   if(S.generating){ return '<div class="tbar"><button class="ic" onclick="go(\'dash\')"><i class="ti ti-chevron-left"></i></button><h2 style="font-size:19px">Séance du jour</h2><span style="width:38px"></span></div><div class="center" style="min-height:380px"><div class="spin" style="border-color:var(--accent);border-top-color:transparent;width:30px;height:30px"></div><div>L\'IA génère ta séance…</div><div class="sub">Quelques secondes</div></div>'; }
@@ -526,6 +526,7 @@ async function openAthlete(id){
   try{ var lr=await db.from('workout_exercises').select('name,actual_load,workouts!inner(date,athlete_id)').eq('workouts.athlete_id',id).not('actual_load','is',null); S.selLifts=(lr.data||[]).map(function(r){return {name:r.name,load:Number(r.actual_load),date:(r.workouts&&r.workouts.date)||''};}).sort(function(a,b){return a.date<b.date?-1:1;}); }catch(_){ S.selLifts=[]; }
   try{ var tr=await db.from('fitness_tests').select('*').eq('athlete_id',id).order('date',{ascending:false}).limit(100); S.selTests=tr.data||[]; }catch(_){ S.selTests=[]; }
   try{ var d30=new Date(); d30.setDate(d30.getDate()-30); var since=ymd(d30); var hr=await db.from('workouts').select('date,status').eq('athlete_id',id).gte('date',since); S.selHist=hr.data||[]; }catch(_){ S.selHist=[]; }
+  try{ var d7=new Date(); d7.setDate(d7.getDate()-6); var s7=ymd(d7); var ck=await db.from('daily_checkins').select('date,fatigue,sleep,motivation,stress,pain').eq('athlete_id',id).gte('date',s7); S.selCk7=ck.data||[]; }catch(_){ S.selCk7=[]; }
   S.screen='coachDetail'; render();
 }
 function scrCoachDetail(){
@@ -569,7 +570,13 @@ function scrCoachDetail(){
     '<button class="btn outline" style="margin-top:9px" onclick="openAthleteGoals()"><i class="ti ti-target"></i> Objectifs (discipline + cibles)</button>'+
     '<button class="btn outline" style="margin-top:9px;color:var(--red);border-color:var(--red)" onclick="doDeleteAthlete()"><i class="ti ti-trash"></i> Supprimer ce compte</button>';
   var goalC=goalsSection(false);
-  return tb+msg+head+etat+goalC+stats+chargesCard+testsCard+info+wt+busy+actions;
+  var ck7=S.selCk7||[]; var avg7=function(arr){ arr=arr.filter(function(v){return v!=null;}); return arr.length?Math.round(arr.reduce(function(a,b){return a+Number(b);},0)/arr.length*10)/10:'—'; };
+  var done7=(S.selHist||[]).filter(function(w){ return w.status==='realisee' && w.date && daysSince(w.date)<=6; }).length;
+  var bilan='<div class="card"><div class="label" style="margin-bottom:6px"><i class="ti ti-report" style="vertical-align:-2px"></i> Bilan 7 jours</div><div class="sub" style="color:var(--ink);line-height:1.9"><b>'+ck7.length+'</b> check-in(s) · <b>'+done7+'</b> séance(s) faite(s)<br>Sommeil moyen <b>'+avg7(ck7.map(function(c){return c.sleep;}))+'/10</b> · Fatigue <b>'+avg7(ck7.map(function(c){return c.fatigue;}))+'/10</b> · Motivation <b>'+avg7(ck7.map(function(c){return c.motivation;}))+'/10</b></div></div>';
+  var cd0=(ap.core_done!=null?Number(ap.core_done):0), hd0=(ap.hiit_done!=null?Number(ap.hiit_done):0);
+  var lvlCard='<div class="card"><div class="label" style="margin-bottom:4px">Niveaux Athlon</div><div class="sub" style="color:var(--ink)">Abdos : <b>niveau '+Math.floor(cd0/3)+'</b> ('+cd0+' validées) · HIIT : <b>niveau '+Math.floor(hd0/3)+'</b> ('+hd0+' validées)</div></div>';
+  var noteCard='<div class="card"><div class="label" style="margin-bottom:6px"><i class="ti ti-message" style="vertical-align:-2px"></i> Mot du coach (visible par l\'athlète)</div><textarea id="cd-note" class="in" style="min-height:60px;resize:vertical" placeholder="ex : Beau boulot cette semaine, pense à bien t\'hydrater…">'+esc(ap.coach_note||'')+'</textarea><button class="btn outline" onclick="doSaveCoachNote()" style="margin-top:8px"><i class="ti ti-device-floppy"></i> Enregistrer le mot</button></div>';
+  return tb+msg+head+etat+bilan+lvlCard+goalC+stats+chargesCard+testsCard+noteCard+info+wt+busy+actions;
 }
 async function doGenForAthlete(kind){
   if(!S.selAthlete){ return; }
@@ -598,6 +605,11 @@ async function doDeleteAthlete(){
     await loadAll(); S.selAthlete=null; S.selAthleteProfile=null; S.msg={k:'ok',t:'Compte supprimé.'}; S.screen='coach'; render();
   }catch(e){ S.coachBusy=false; S.msg={k:'err',t:'Erreur : '+(e.message||e)}; render(); }
 }
+async function doSaveCoachNote(){
+  if(!S.selAthlete) return; var e=document.getElementById('cd-note'); var v=e?e.value.trim():'';
+  try{ await db.from('profiles').update({coach_note:v||null}).eq('id',S.selAthlete.id); if(S.selAthleteProfile)S.selAthleteProfile.coach_note=v||null; S.msg={k:'ok',t:'Mot du coach enregistré — ton athlète le verra sur son accueil.'}; render(); }catch(err){ S.msg={k:'err',t:'Erreur : '+(err.message||err)}; render(); }
+}
+function coachNoteCard(){ var p=S.profile||{}; if(!p.coach_note) return ''; return '<div class="card" style="border:1px solid var(--accent)"><div class="label" style="color:var(--accent);margin-bottom:4px"><i class="ti ti-message" style="vertical-align:-2px"></i> Mot de ton coach</div><div class="sub" style="color:var(--ink)">'+esc(p.coach_note)+'</div></div>'; }
 function scrNewAthlete(){
   var tb='<div class="tbar"><button class="ic" onclick="go(\'coach\')"><i class="ti ti-chevron-left"></i></button><h2 style="font-size:19px">Créer un athlète</h2><span style="width:38px"></span></div>';
   var msg=S.msg?'<div class="msg '+S.msg.k+'">'+S.msg.t+'</div>':'';
@@ -641,12 +653,27 @@ function scrAthleteEdit(){
     inField('ae-dur','Durée par séance (min)',p.session_duration_min,'number','60')+
     inField('ae-injuries','Blessures / restrictions',p.injuries_current,'text','Aucune, genou droit…')+
     selField('ae-team','Équipe',p.team,teamOpts())+
+    '<div class="label" style="margin:14px 2px 6px">PHYSIOLOGIE</div>'+
+    inField('ae-height','Taille (cm)',p.height_cm,'number','175')+
+    inField('ae-birth','Année de naissance',p.birth_year,'number','1990')+
+    selField('ae-sex','Sexe',p.sex,[['homme','Homme'],['femme','Femme'],['autre','Autre']])+
+    inField('ae-exp','Expérience sportive',p.sport_experience,'text','ex : 3 ans de muscu…')+
+    '<div class="label" style="margin:14px 2px 6px">ENTRAÎNEMENT</div>'+
+    inField('ae-freq','Séances par semaine',p.weekly_sessions,'number','4')+
+    selField('ae-activity','Activité au quotidien',p.activity_level,[['sedentaire','Assis / sédentaire'],['debout','Debout / marche'],['physique','Métier physique']])+
+    inField('ae-areas','Zones prioritaires',p.priority_areas,'text','ex : jambes, gainage')+
+    inField('ae-avoid','Exercices à éviter',p.avoided_exercises,'text','ex : sauts (genoux)')+
+    '<div class="label" style="margin:14px 2px 6px">NUTRITION</div>'+
+    inField('ae-meals','Repas / jour',p.meals_per_day,'number','4')+
+    inField('ae-allergies','Allergies',p.allergies,'text','aucune…')+
+    inField('ae-diet','Régime',p.special_diet,'text','aucun, végétarien…')+
+    inField('ae-dislikes','Aliments détestés',p.disliked_foods,'text','ex : brocoli')+
     '<button class="btn" id="b-ae" onclick="doSaveAthleteProfile()"><i class="ti ti-check"></i> Enregistrer</button>';
 }
 async function doSaveAthleteProfile(){
   if(!S.selAthlete) return;
   var g=function(id){var e=document.getElementById(id);return e?e.value.trim():'';};
-  var upd={ first_name:g('ae-first')||null, sport_level:g('ae-level')||null, available_equipment:g('ae-equip')||null, session_duration_min:parseInt(g('ae-dur'))||null, injuries_current:g('ae-injuries')||null, team:g('ae-team')||null };
+  var upd={ first_name:g('ae-first')||null, sport_level:g('ae-level')||null, available_equipment:g('ae-equip')||null, session_duration_min:parseInt(g('ae-dur'))||null, injuries_current:g('ae-injuries')||null, team:g('ae-team')||null, height_cm:parseInt(g('ae-height'))||null, birth_year:parseInt(g('ae-birth'))||null, sex:g('ae-sex')||null, sport_experience:g('ae-exp')||null, weekly_sessions:parseInt(g('ae-freq'))||null, activity_level:g('ae-activity')||null, priority_areas:g('ae-areas')||null, avoided_exercises:g('ae-avoid')||null, meals_per_day:parseInt(g('ae-meals'))||null, allergies:g('ae-allergies')||null, special_diet:g('ae-diet')||null, disliked_foods:g('ae-dislikes')||null };
   var btn=document.getElementById('b-ae'); if(btn){ btn.disabled=true; btn.innerHTML='<span class="spin"></span>'; }
   try{
     var r=await db.from('profiles').update(upd).eq('id',S.selAthlete.id);
@@ -1682,16 +1709,16 @@ async function saveGoals(self, arr){
   else { if(S.selAthleteProfile){ S.selAthleteProfile.goal_detail=arr; S.selAthleteProfile.main_goal=disc; if(poids!=null)S.selAthleteProfile.target_weight=poids; } if(S.selAthlete)S.selAthlete.main_goal=disc; }
 }
 var CORE_BASE=[['Gainage planche',30],['Gainage latéral droit',20],['Gainage latéral gauche',20],['Relevés de jambes',30],['Hollow hold',25]];
-function coreDone(){ try{ return parseInt(localStorage.getItem('athlon_core_done'))||0; }catch(_){ return 0; } }
+function coreDone(){ if(S.profile&&S.profile.core_done!=null) return Number(S.profile.core_done)||0; try{ return parseInt(localStorage.getItem('athlon_core_done'))||0; }catch(_){ return 0; } }
 function coreLevel(){ return Math.floor(coreDone()/3); }
 function coreParams(){ var lv=coreLevel(); var bonus=lv*5; var rounds=Math.min(3+lv,6); var rest=Math.max(10,20-lv*2); var exos=CORE_BASE.map(function(e){ return [e[0], e[1]+bonus]; }); return {level:lv, rounds:rounds, rest:rest, exos:exos}; }
-function validateCore(){ var d=coreDone()+1; try{ localStorage.setItem('athlon_core_done',String(d)); }catch(_){} var lv=Math.floor(d/3); if(d%3===0){ S.msg={k:'ok',t:'Séance abdos validée ! Tu passes au niveau '+lv+' 💪 — plus de tours et exercices plus longs.'}; } else { S.msg={k:'ok',t:'Séance abdos validée ! Encore '+(3-(d%3))+' pour monter de niveau.'}; } render(); }
+function validateCore(){ var d=coreDone()+1; try{ localStorage.setItem('athlon_core_done',String(d)); }catch(_){} if(S.profile)S.profile.core_done=d; try{ if(S.user) db.from('profiles').update({core_done:d}).eq('id',S.user.id); }catch(_){} var lv=Math.floor(d/3); if(d%3===0){ S.msg={k:'ok',t:'Séance abdos validée ! Tu passes au niveau '+lv+' 💪 — plus de tours et exercices plus longs.'}; } else { S.msg={k:'ok',t:'Séance abdos validée ! Encore '+(3-(d%3))+' pour monter de niveau.'}; } render(); }
 var HIIT_BASE=[['Jumping jacks',40],['Montées de genoux',40],['Burpees',30],['Mountain climbers',40],['Squats sautés',30]];
-function hiitDone(){ try{ return parseInt(localStorage.getItem('athlon_hiit_done'))||0; }catch(_){ return 0; } }
+function hiitDone(){ if(S.profile&&S.profile.hiit_done!=null) return Number(S.profile.hiit_done)||0; try{ return parseInt(localStorage.getItem('athlon_hiit_done'))||0; }catch(_){ return 0; } }
 function hiitLevel(){ return Math.floor(hiitDone()/3); }
 function hiitParams(){ var lv=hiitLevel(); var bonus=Math.min(lv*5,20); var rounds=Math.min(4+lv,8); var rest=Math.max(10,20-lv*2); var exos=HIIT_BASE.map(function(e){ return [e[0], e[1]+bonus]; }); return {level:lv, rounds:rounds, rest:rest, exos:exos}; }
 function startHiitCircuit(){ var p=hiitParams(); var steps=[]; for(var r=1;r<=p.rounds;r++){ p.exos.forEach(function(e,i){ steps.push({label:e[0],sec:e[1],kind:'work',round:r}); var last=(r===p.rounds && i===p.exos.length-1); if(!last) steps.push({label:'Repos',sec:p.rest,kind:'rest',round:r}); }); } startCircuit(steps); }
-function validateHiit(){ var d=hiitDone()+1; try{ localStorage.setItem('athlon_hiit_done',String(d)); }catch(_){} var lv=Math.floor(d/3); if(d%3===0){ S.msg={k:'ok',t:'HIIT validé ! Niveau '+lv+' 🔥 — plus de tours.'}; } else { S.msg={k:'ok',t:'HIIT validé ! Encore '+(3-(d%3))+' pour le niveau suivant.'}; } render(); }
+function validateHiit(){ var d=hiitDone()+1; try{ localStorage.setItem('athlon_hiit_done',String(d)); }catch(_){} if(S.profile)S.profile.hiit_done=d; try{ if(S.user) db.from('profiles').update({hiit_done:d}).eq('id',S.user.id); }catch(_){} var lv=Math.floor(d/3); if(d%3===0){ S.msg={k:'ok',t:'HIIT validé ! Niveau '+lv+' 🔥 — plus de tours.'}; } else { S.msg={k:'ok',t:'HIIT validé ! Encore '+(3-(d%3))+' pour le niveau suivant.'}; } render(); }
 function scrHiit(){
   var p=hiitParams(); var done=hiitDone();
   var tb='<div class="tbar"><button class="ic" onclick="go(\'dash\')"><i class="ti ti-chevron-left"></i></button><h2 style="font-size:19px">HIIT express</h2><span style="width:38px"></span></div>';
