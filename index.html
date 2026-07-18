@@ -138,8 +138,13 @@ function pseudoClean(p){ return (p==null?'':String(p)).trim().toLowerCase().norm
 function pseudoToEmail(p){ var c=pseudoClean(p); return c?c+'@coachia.local':''; }
 function loginToEmail(v){ v=(v||'').trim(); return v.indexOf('@')>=0 ? v.toLowerCase() : pseudoToEmail(v); }
 
+function saveCache(){ try{ localStorage.setItem('athlon_cache', JSON.stringify({ date:today(), workout:S.workout, exercises:S.exercises, muscu:S.muscu, runPlan:S.runPlan, profile:S.profile, todayScore:S.todayScore, todayCheckin:S.todayCheckin, weights:S.weights, tests:S.tests, runs:S.runs, history:S.history })); }catch(_){} }
+function loadCache(){ try{ var c=JSON.parse(localStorage.getItem('athlon_cache')||'null'); if(!c) return false; S.workout=c.workout||null; S.exercises=c.exercises||[]; S.muscu=c.muscu||null; S.runPlan=c.runPlan||null; S.profile=c.profile||null; S.todayScore=c.todayScore||null; S.todayCheckin=c.todayCheckin||null; S.weights=c.weights||[]; S.tests=c.tests||[]; S.runs=c.runs||[]; S.history=c.history||[]; S.athletes=[]; return !!c.profile; }catch(_){ return false; } }
+try{ if(typeof window!=='undefined') window.addEventListener('online',function(){ if(S.user){ loadAll().then(function(){ render(); }); } }); }catch(_){}
 async function loadAll(){
   const uid = S.user.id;
+  if(typeof navigator!=='undefined' && navigator.onLine===false){ if(loadCache()){ S.offline=true; return; } }
+  S.offline=false;
   const { data:prof } = await db.from('profiles').select('*').eq('id', uid).maybeSingle();
   S.profile = prof;
   S.runPlan = (prof && prof.run_plan) || null;
@@ -174,6 +179,7 @@ async function loadAll(){
     } }catch(_){}
     S.teams=(S.profile&&Array.isArray(S.profile.teams))?S.profile.teams:[];
   }
+  saveCache();
 }
 async function saveCheckin(c){
   const uid = S.user.id; const d = today();
@@ -223,7 +229,7 @@ function toolsBlock(){
   return goalsMiniCard()+
     '<div class="card" style="display:flex;align-items:center;justify-content:space-between"><span class="label" style="margin:0">Poids actuel</span><span style="font-weight:700;color:var(--ink)">'+lastW+'</span></div>'+
     '<div class="card" onclick="go(\'programopts\')" style="cursor:pointer;background:var(--accent);border:none"><div style="font-weight:700;font-size:15px;color:#fff"><i class="ti ti-wand"></i> Créer mon programme complet</div><div style="font-size:12px;color:#fff;opacity:.9;margin-top:3px">Muscu + course + objectif, sur un seul planning</div></div>'+
-    '<div class="label" style="margin:12px 2px 8px">Mes outils</div><div class="tiles">'+tile('ti-barbell','Programme muscu','muscu')+tile('ti-run','Sorties course','runs')+tile('ti-bolt','HIIT express','hiit')+tile('ti-salad','Nutrition','nutrition')+tile('ti-calendar-event','Agenda','calendar')+tile('ti-chart-line','Charges','charges')+tile('ti-robot','Assistant IA','assistant')+tile('ti-file-text','Rapport','report')+tile('ti-trophy','Compétitions','comps')+tile('ti-trending-up','Ma progression','progress')+tile('ti-clipboard-check','Mes tests','tests')+tile('ti-award','Records','records')+tile('ti-medal','Mes badges','badges')+(p.role==='admin'?tile('ti-crown','Classement','leaderboard'):'')+tile('ti-message-circle','Avis','feedback')+'</div>';
+    '<div class="label" style="margin:12px 2px 8px">Mes outils</div><div class="tiles">'+tile('ti-barbell','Programme muscu','muscu')+tile('ti-run','Sorties course','runs')+tile('ti-bolt','HIIT express','hiit')+tile('ti-salad','Nutrition','nutrition')+tile('ti-calendar-event','Agenda','calendar')+tile('ti-chart-line','Charges','charges')+tile('ti-robot','Assistant IA','assistant')+tile('ti-file-text','Rapport','report')+tile('ti-trophy','Compétitions','comps')+tile('ti-trending-up','Ma progression','progress')+tile('ti-clipboard-check','Mes tests','tests')+tile('ti-award','Records','records')+tile('ti-medal','Mes badges','badges')+(p.role==='admin'?tile('ti-crown','Classement','leaderboard'):'')+tile('ti-first-aid-kit','Je me suis blessé','injury')+tile('ti-message-circle','Avis','feedback')+'</div>';
 }
 function scrDash(){
   const sc = S.todayScore; const hasScore = !!sc; const lvl = hasScore ? sc.level : null;
@@ -244,7 +250,7 @@ function scrDash(){
   }
   const w = S.weights; const lastW = w.length ? Number(w[w.length-1].weight).toFixed(1)+' kg' : '—';
   return '<div class="tbar"><div><div class="t">'+new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'})+'</div><h2>Bonjour, '+esc(displayName())+'</h2></div><button class="ic" onclick="go(\'profile\')" title="Mon profil"><i class="ti ti-user"></i></button></div>'+
-    topAlert()+streakCard()+coachEntryCard()+checkinBlock()+heroCard()+'<button class="btn outline" onclick="toggleTools()" style="margin-top:2px"><i class="ti '+(S.showTools?'ti-chevron-up':'ti-layout-grid')+'"></i> '+(S.showTools?'Masquer les outils':'Tous mes outils')+'</button>'+toolsBlock();
+    (S.offline?'<div class="banner" style="background:var(--amber-bg)"><i class="ti ti-wifi-off" style="color:var(--amber)"></i><div class="x" style="color:#7a4a12">Mode hors-ligne — voici les données de ta dernière connexion. Reconnecte-toi pour synchroniser.</div></div>':'')+topAlert()+streakCard()+coachEntryCard()+checkinBlock()+heroCard()+'<button class="btn outline" onclick="toggleTools()" style="margin-top:2px"><i class="ti '+(S.showTools?'ti-chevron-up':'ti-layout-grid')+'"></i> '+(S.showTools?'Masquer les outils':'Tous mes outils')+'</button>'+toolsBlock();
 }
 function scrWorkout(){
   if(S.generating){ return '<div class="tbar"><button class="ic" onclick="go(\'dash\')"><i class="ti ti-chevron-left"></i></button><h2 style="font-size:19px">Séance du jour</h2><span style="width:38px"></span></div><div class="center" style="min-height:380px"><div class="spin" style="border-color:var(--accent);border-top-color:transparent;width:30px;height:30px"></div><div>L\'IA génère ta séance…</div><div class="sub">Quelques secondes</div></div>'; }
@@ -1881,6 +1887,23 @@ function scrProgress(){
   var empty=(!prs.length&&!tk.length&&w.length<2)?'<div class="card flat" style="text-align:center;padding:20px"><div class="sub">Fais tes premières séances, check-ins et tests : ta progression s\'affichera ici.</div></div>':'';
   return tb+'<div class="banner" style="background:var(--accent-soft)"><i class="ti ti-trending-up" style="color:var(--accent)"></i><div class="x" style="color:#1742a5">Ton parcours en un coup d\'œil : série, séances, poids, records et niveaux.</div></div>'+top+weightCard+recCard+testCard+empty;
 }
+function scrInjury(){
+  var p=S.profile||{};
+  var tb='<div class="tbar"><button class="ic" onclick="go(\'dash\')"><i class="ti ti-chevron-left"></i></button><h2 style="font-size:19px">Signaler une blessure</h2><span style="width:38px"></span></div>';
+  var msg=S.msg?'<div class="msg '+S.msg.k+'">'+S.msg.t+'</div>':'';
+  var zones=['Genou','Cheville','Épaule','Dos / lombaires','Poignet','Coude','Hanche','Ischio / cuisse','Mollet','Cou','Pied','Main'].map(function(x){return [x,x];});
+  var cur=p.injuries_current?'<div class="card"><div class="label" style="margin-bottom:4px">Actuellement signalé</div><div class="sub" style="color:var(--ink)">'+esc(p.injuries_current)+'</div><button class="btn outline" onclick="doClearInjury()" style="margin-top:9px;color:var(--green);border-color:var(--green)"><i class="ti ti-heart"></i> Je suis guéri — retirer</button></div>':'';
+  return tb+msg+'<div class="banner" style="background:var(--amber-bg)"><i class="ti ti-first-aid-kit" style="color:var(--amber)"></i><div class="x" style="color:#7a4a12">Indique une zone gênante ou blessée : l\'IA évitera les exercices à risque sur tes prochaines séances, jusqu\'à ce que tu la retires.</div></div>'+cur+selField('inj-zone','Zone touchée',null,zones)+inField('inj-note','Précision (optionnel)',null,'text','ex : douleur en flexion, depuis 3 jours')+'<button class="btn" onclick="doSaveInjury()"><i class="ti ti-alert-triangle"></i> Signaler — adapter mes séances</button>';
+}
+async function doSaveInjury(){
+  var z=(document.getElementById('inj-zone')||{}).value||''; var n=((document.getElementById('inj-note')||{}).value||'').trim();
+  if(!z){ S.msg={k:'err',t:'Choisis une zone.'}; render(); return; }
+  var txt=z+(n?' ('+n+')':'')+' — signalé le '+today();
+  try{ await db.from('profiles').update({injuries_current:txt}).eq('id',S.user.id); if(S.profile)S.profile.injuries_current=txt; S.msg={k:'ok',t:'Blessure signalée. Régénère une séance : elle évitera cette zone.'}; S.screen='dash'; render(); }catch(e){ S.msg={k:'err',t:'Erreur : '+(e.message||e)}; render(); }
+}
+async function doClearInjury(){
+  try{ await db.from('profiles').update({injuries_current:null}).eq('id',S.user.id); if(S.profile)S.profile.injuries_current=null; S.msg={k:'ok',t:'Content que tu sois remis ! Tes séances repartent normales.'}; render(); }catch(e){ S.msg={k:'err',t:'Erreur : '+(e.message||e)}; render(); }
+}
 function motivPhrase(d){
   if(d>=7) return 'Content de te revoir ! On repart en douceur, sans culpabiliser — ton corps te remerciera.';
   if(d>=4) return 'Quelques jours sans séance, ce n\'est pas grave : l\'important, c\'est de repartir. Une mini-séance suffit pour relancer la machine.';
@@ -1922,7 +1945,7 @@ function render(extra){
   else if(S.screen==='onboarding'){ html=scrOnboarding(); nav.style.display='none'; }
   else if(S.screen==='result'){ html=scrResult(extra); nav.style.display='flex'; nav.innerHTML=navBar(); }
   else { nav.style.display='flex'; nav.innerHTML=navBar();
-    html = S.screen==='checkin'?scrCheckin():(S.screen==='workout'?scrWorkout():(S.screen==='profile'?scrProfile():(S.screen==='genopts'?scrGenOptions():(S.screen==='charges'?scrCharges():(S.screen==='calendar'?scrCalendar():(S.screen==='coach'?scrCoach():(S.screen==='coachDetail'?scrCoachDetail():(S.screen==='nutrition'?scrNutrition():(S.screen==='runs'?scrRuns():(S.screen==='badges'?scrBadges():(S.screen==='feedback'?scrFeedback():(S.screen==='comps'?scrComps():(S.screen==='assistant'?scrAssistant():(S.screen==='report'?scrReport():(S.screen==='runplanopts'?scrRunPlanOpts():(S.screen==='runsession'?scrRunSession():(S.screen==='newathlete'?scrNewAthlete():(S.screen==='athleteEdit'?scrAthleteEdit():(S.screen==='muscu'?scrMuscu():(S.screen==='muscuopts'?scrMuscuOpts():(S.screen==='muscuday'?scrMuscuDay():(S.screen==='exodetail'?scrExoDetail():(S.screen==='leaderboard'?scrLeaderboard():(S.screen==='groupsession'?scrGroupSession():(S.screen==='programopts'?scrProgramOpts():(S.screen==='tests'?scrTests():(S.screen==='goals'?scrGoals():(S.screen==='goaledit'?scrGoalEdit():(S.screen==='records'?scrRecords():(S.screen==='teams'?scrTeams():(S.screen==='hiit'?scrHiit():(S.screen==='progress'?scrProgress():scrDash()))))))))))))))))))))))))))))))));
+    html = S.screen==='checkin'?scrCheckin():(S.screen==='workout'?scrWorkout():(S.screen==='profile'?scrProfile():(S.screen==='genopts'?scrGenOptions():(S.screen==='charges'?scrCharges():(S.screen==='calendar'?scrCalendar():(S.screen==='coach'?scrCoach():(S.screen==='coachDetail'?scrCoachDetail():(S.screen==='nutrition'?scrNutrition():(S.screen==='runs'?scrRuns():(S.screen==='badges'?scrBadges():(S.screen==='feedback'?scrFeedback():(S.screen==='comps'?scrComps():(S.screen==='assistant'?scrAssistant():(S.screen==='report'?scrReport():(S.screen==='runplanopts'?scrRunPlanOpts():(S.screen==='runsession'?scrRunSession():(S.screen==='newathlete'?scrNewAthlete():(S.screen==='athleteEdit'?scrAthleteEdit():(S.screen==='muscu'?scrMuscu():(S.screen==='muscuopts'?scrMuscuOpts():(S.screen==='muscuday'?scrMuscuDay():(S.screen==='exodetail'?scrExoDetail():(S.screen==='leaderboard'?scrLeaderboard():(S.screen==='groupsession'?scrGroupSession():(S.screen==='programopts'?scrProgramOpts():(S.screen==='tests'?scrTests():(S.screen==='goals'?scrGoals():(S.screen==='goaledit'?scrGoalEdit():(S.screen==='records'?scrRecords():(S.screen==='teams'?scrTeams():(S.screen==='hiit'?scrHiit():(S.screen==='progress'?scrProgress():(S.screen==='injury'?scrInjury():scrDash())))))))))))))))))))))))))))))))));
   }
   sc.innerHTML=html; sc.scrollTop=0; S.msg=null;
   const e=document.getElementById('i-email'); if(e) e.addEventListener('keydown',ev=>{if(ev.key==='Enter')document.getElementById('i-pass').focus();});
