@@ -223,7 +223,7 @@ function toolsBlock(){
   return goalsMiniCard()+
     '<div class="card" style="display:flex;align-items:center;justify-content:space-between"><span class="label" style="margin:0">Poids actuel</span><span style="font-weight:700;color:var(--ink)">'+lastW+'</span></div>'+
     '<div class="card" onclick="go(\'programopts\')" style="cursor:pointer;background:var(--accent);border:none"><div style="font-weight:700;font-size:15px;color:#fff"><i class="ti ti-wand"></i> Créer mon programme complet</div><div style="font-size:12px;color:#fff;opacity:.9;margin-top:3px">Muscu + course + objectif, sur un seul planning</div></div>'+
-    '<div class="label" style="margin:12px 2px 8px">Mes outils</div><div class="tiles">'+tile('ti-barbell','Programme muscu','muscu')+tile('ti-run','Sorties course','runs')+tile('ti-bolt','HIIT express','hiit')+tile('ti-salad','Nutrition','nutrition')+tile('ti-calendar-event','Agenda','calendar')+tile('ti-chart-line','Charges','charges')+tile('ti-robot','Assistant IA','assistant')+tile('ti-file-text','Rapport','report')+tile('ti-trophy','Compétitions','comps')+tile('ti-clipboard-check','Mes tests','tests')+tile('ti-award','Records','records')+tile('ti-medal','Mes badges','badges')+(p.role==='admin'?tile('ti-crown','Classement','leaderboard'):'')+tile('ti-message-circle','Avis','feedback')+'</div>';
+    '<div class="label" style="margin:12px 2px 8px">Mes outils</div><div class="tiles">'+tile('ti-barbell','Programme muscu','muscu')+tile('ti-run','Sorties course','runs')+tile('ti-bolt','HIIT express','hiit')+tile('ti-salad','Nutrition','nutrition')+tile('ti-calendar-event','Agenda','calendar')+tile('ti-chart-line','Charges','charges')+tile('ti-robot','Assistant IA','assistant')+tile('ti-file-text','Rapport','report')+tile('ti-trophy','Compétitions','comps')+tile('ti-trending-up','Ma progression','progress')+tile('ti-clipboard-check','Mes tests','tests')+tile('ti-award','Records','records')+tile('ti-medal','Mes badges','badges')+(p.role==='admin'?tile('ti-crown','Classement','leaderboard'):'')+tile('ti-message-circle','Avis','feedback')+'</div>';
 }
 function scrDash(){
   const sc = S.todayScore; const hasScore = !!sc; const lvl = hasScore ? sc.level : null;
@@ -244,7 +244,7 @@ function scrDash(){
   }
   const w = S.weights; const lastW = w.length ? Number(w[w.length-1].weight).toFixed(1)+' kg' : '—';
   return '<div class="tbar"><div><div class="t">'+new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'})+'</div><h2>Bonjour, '+esc(displayName())+'</h2></div><button class="ic" onclick="go(\'profile\')" title="Mon profil"><i class="ti ti-user"></i></button></div>'+
-    topAlert()+coachEntryCard()+checkinBlock()+heroCard()+'<button class="btn outline" onclick="toggleTools()" style="margin-top:2px"><i class="ti '+(S.showTools?'ti-chevron-up':'ti-layout-grid')+'"></i> '+(S.showTools?'Masquer les outils':'Tous mes outils')+'</button>'+toolsBlock();
+    topAlert()+streakCard()+coachEntryCard()+checkinBlock()+heroCard()+'<button class="btn outline" onclick="toggleTools()" style="margin-top:2px"><i class="ti '+(S.showTools?'ti-chevron-up':'ti-layout-grid')+'"></i> '+(S.showTools?'Masquer les outils':'Tous mes outils')+'</button>'+toolsBlock();
 }
 function scrWorkout(){
   if(S.generating){ return '<div class="tbar"><button class="ic" onclick="go(\'dash\')"><i class="ti ti-chevron-left"></i></button><h2 style="font-size:19px">Séance du jour</h2><span style="width:38px"></span></div><div class="center" style="min-height:380px"><div class="spin" style="border-color:var(--accent);border-top-color:transparent;width:30px;height:30px"></div><div>L\'IA génère ta séance…</div><div class="sub">Quelques secondes</div></div>'; }
@@ -1745,32 +1745,34 @@ function renderTimer(){
 }
 function timerTick(){
   if(!TIMER.running) return;
+  var now=Date.now();
   if(TIMER.mode==='circuit'){
-    TIMER.remaining-=1;
-    if(TIMER.remaining<=0){
+    while(TIMER.running && now>=TIMER.endAt){
       timerBeep(); timerVibe([150,80,150]); TIMER.idx++;
-      if(TIMER.idx>=(TIMER.steps||[]).length){ TIMER.running=false; if(TIMER.id){clearInterval(TIMER.id);TIMER.id=null;} setTimeout(timerBeep,250); TIMER.mode=null; renderTimer(); return; }
-      TIMER.remaining=TIMER.steps[TIMER.idx].sec;
+      if(TIMER.idx>=(TIMER.steps||[]).length){ TIMER.running=false; if(TIMER.id){clearInterval(TIMER.id);TIMER.id=null;} TIMER.mode=null; renderTimer(); return; }
+      TIMER.endAt += TIMER.steps[TIMER.idx].sec*1000;
     }
+    TIMER.remaining=Math.max(0,Math.ceil((TIMER.endAt-now)/1000));
     renderTimer(); return;
   }
-  if(TIMER.mode==='rest'){ TIMER.remaining-=1; if(TIMER.remaining<=0){ TIMER.remaining=0; TIMER.running=false; if(TIMER.id){clearInterval(TIMER.id);TIMER.id=null;} timerBeep(); timerVibe([200,100,200]); } }
-  else { TIMER.elapsed+=1; }
+  if(TIMER.mode==='rest'){ TIMER.remaining=Math.max(0,Math.ceil((TIMER.endAt-now)/1000)); if(TIMER.remaining<=0){ TIMER.running=false; if(TIMER.id){clearInterval(TIMER.id);TIMER.id=null;} timerBeep(); timerVibe([200,100,200]); } }
+  else if(TIMER.mode==='stop'){ TIMER.elapsed=TIMER.baseElapsed+Math.floor((now-TIMER.startAt)/1000); }
   renderTimer();
 }
 function timerInterval(){ if(TIMER.id){ clearInterval(TIMER.id); } TIMER.id=setInterval(timerTick,1000); }
-function startRest(sec){ sec=sec||90; TIMER.mode='rest'; TIMER.remaining=sec; TIMER.total=sec; TIMER.running=true; timerInterval(); renderTimer(); timerVibe(30); }
-function startStopwatch(){ if(TIMER.mode==='stop'){ timerStop(); return; } TIMER.mode='stop'; TIMER.elapsed=0; TIMER.running=true; timerInterval(); renderTimer(); }
-function timerToggle(){ TIMER.running=!TIMER.running; if(TIMER.running){ timerInterval(); } else if(TIMER.id){ clearInterval(TIMER.id); TIMER.id=null; } renderTimer(); }
-function timerAdd(s){ if(TIMER.mode==='rest'){ TIMER.remaining+=s; TIMER.total+=s; if(!TIMER.running){ TIMER.running=true; timerInterval(); } renderTimer(); } }
-function timerReset(){ if(TIMER.mode==='stop'){ TIMER.elapsed=0; } else if(TIMER.mode==='rest'){ TIMER.remaining=TIMER.total; } renderTimer(); }
+function startRest(sec){ sec=sec||90; TIMER.mode='rest'; TIMER.total=sec; TIMER.remaining=sec; TIMER.endAt=Date.now()+sec*1000; TIMER.running=true; timerInterval(); renderTimer(); timerVibe(30); }
+function startStopwatch(){ if(TIMER.mode==='stop'){ timerStop(); return; } TIMER.mode='stop'; TIMER.baseElapsed=0; TIMER.startAt=Date.now(); TIMER.elapsed=0; TIMER.running=true; timerInterval(); renderTimer(); }
+function timerToggle(){ var now=Date.now(); if(TIMER.running){ if(TIMER.mode==='rest'||TIMER.mode==='circuit'){ TIMER.remaining=Math.max(0,Math.ceil((TIMER.endAt-now)/1000)); } else if(TIMER.mode==='stop'){ TIMER.baseElapsed=TIMER.baseElapsed+Math.floor((now-TIMER.startAt)/1000); TIMER.elapsed=TIMER.baseElapsed; } TIMER.running=false; if(TIMER.id){ clearInterval(TIMER.id); TIMER.id=null; } } else { if(TIMER.mode==='rest'||TIMER.mode==='circuit'){ TIMER.endAt=now+(TIMER.remaining||0)*1000; } else if(TIMER.mode==='stop'){ TIMER.startAt=now; } TIMER.running=true; timerInterval(); } renderTimer(); }
+function timerAdd(s){ if(TIMER.mode==='rest'){ TIMER.total+=s; if(TIMER.running){ TIMER.endAt+=s*1000; TIMER.remaining=Math.max(0,Math.ceil((TIMER.endAt-Date.now())/1000)); } else { TIMER.remaining+=s; } renderTimer(); } }
+function timerReset(){ var now=Date.now(); if(TIMER.mode==='stop'){ TIMER.baseElapsed=0; TIMER.startAt=now; TIMER.elapsed=0; } else if(TIMER.mode==='rest'){ TIMER.remaining=TIMER.total; if(TIMER.running) TIMER.endAt=now+TIMER.total*1000; } renderTimer(); }
 function timerStop(){ TIMER.mode=null; TIMER.running=false; if(TIMER.id){ clearInterval(TIMER.id); TIMER.id=null; } renderTimer(); }
 function restSeconds(str){ if(!str) return 90; str=String(str).toLowerCase(); var m; if((m=str.match(/(\d+)\s*min(?:\s*(\d+))?/))){ return parseInt(m[1])*60+(m[2]?parseInt(m[2]):0); } if((m=str.match(/(\d+)\s*[:’'](\d+)/))){ return parseInt(m[1])*60+parseInt(m[2]); } if((m=str.match(/(\d+)\s*s/))){ return parseInt(m[1]); } if((m=str.match(/(\d+)/))){ var n=parseInt(m[1]); return n<10?n*60:n; } return 90; }
 function startRestFor(i){ var e=(S.exercises||[])[i]; startRest(restSeconds(e&&e.rest)); }
 function doseSeconds(str){ if(!str) return 0; str=String(str).toLowerCase(); var m; if((m=str.match(/(\d+)\s*min(?:\s*(\d+))?/))) return parseInt(m[1])*60+(m[2]?parseInt(m[2]):0); if((m=str.match(/(\d+)\s*s/))) return parseInt(m[1]); if((m=str.match(/(\d+)/))) return parseInt(m[1]); return 0; }
 function buildCircuit(hc){ var steps=[]; var R=hc.rounds||1; for(var r=1;r<=R;r++){ (hc.ex||[]).forEach(function(e){ var w=doseSeconds(e[1]); if(w>0) steps.push({label:e[0],sec:w,kind:'work',round:r}); var rest=e[2]||0; if(rest>0) steps.push({label:'Repos',sec:rest,kind:'rest',round:r}); }); } return steps; }
-function startCircuit(steps){ if(!steps||!steps.length) return; TIMER.mode='circuit'; TIMER.steps=steps; TIMER.idx=0; TIMER.remaining=steps[0].sec; TIMER.running=true; timerInterval(); renderTimer(); timerVibe(30); }
-function timerSkip(){ if(TIMER.mode!=='circuit') return; TIMER.idx++; if(TIMER.idx>=(TIMER.steps||[]).length){ timerStop(); return; } TIMER.remaining=TIMER.steps[TIMER.idx].sec; if(!TIMER.running){ TIMER.running=true; timerInterval(); } renderTimer(); }
+function startCircuit(steps){ if(!steps||!steps.length) return; TIMER.mode='circuit'; TIMER.steps=steps; TIMER.idx=0; TIMER.remaining=steps[0].sec; TIMER.endAt=Date.now()+steps[0].sec*1000; TIMER.running=true; timerInterval(); renderTimer(); timerVibe(30); }
+function timerSkip(){ if(TIMER.mode!=='circuit') return; TIMER.idx++; if(TIMER.idx>=(TIMER.steps||[]).length){ timerStop(); return; } TIMER.remaining=TIMER.steps[TIMER.idx].sec; TIMER.endAt=Date.now()+TIMER.remaining*1000; if(!TIMER.running){ TIMER.running=true; timerInterval(); } renderTimer(); }
+try{ if(typeof document!=='undefined') document.addEventListener('visibilitychange',function(){ if(!document.hidden && TIMER && TIMER.running){ timerTick(); } }); }catch(_){}
 function startRunCircuit(){ var sel=S.selRun; if(!sel||!S.runPlan) return; var s=S.runPlan.weeks[sel.w].sessions[sel.s]; if(!s) return; var hc=homeCardioPlan(s.t); startCircuit(buildCircuit(hc)); }
 function startCoreCircuit(){ var p=coreParams(); var steps=[]; for(var r=1;r<=p.rounds;r++){ p.exos.forEach(function(e,i){ steps.push({label:e[0],sec:e[1],kind:'work',round:r}); var last=(r===p.rounds && i===p.exos.length-1); if(!last) steps.push({label:'Repos',sec:p.rest,kind:'rest',round:r}); }); } startCircuit(steps); }
 function startFinisherCircuit(){ var routine=finisherRoutine(); if(!routine.length) return; var steps=routine.map(function(m){ return {label:m.n, sec:m.s, kind:'work', round:1}; }); startCircuit(steps); }
@@ -1849,6 +1851,36 @@ function lastActiveDate(){
   dates.sort();
   return dates[dates.length-1];
 }
+function activeDatesSet(){
+  var s={};
+  if(S.todayCheckin) s[today()]=1;
+  (S.weights||[]).forEach(function(w){ if(w.date) s[w.date]=1; });
+  (S.history||[]).forEach(function(w){ if(w.date && w.status==='realisee') s[w.date]=1; });
+  (S.runs||[]).forEach(function(r){ if(r.date) s[r.date]=1; });
+  if(S.muscu&&S.muscu.days) S.muscu.days.forEach(function(d){ if(d.done&&d.date) s[d.date]=1; });
+  return s;
+}
+function computeStreak(){
+  var s=activeDatesSet(); var cur=new Date(today()+'T00:00:00');
+  if(!s[ymd(cur)]){ cur.setDate(cur.getDate()-1); if(!s[ymd(cur)]) return 0; }
+  var n=0; while(s[ymd(cur)]){ n++; cur.setDate(cur.getDate()-1); }
+  return n;
+}
+function streakCard(){ var n=computeStreak(); if(n<2) return ''; return '<div class="card" style="display:flex;align-items:center;gap:12px;padding:11px 15px"><span style="font-size:24px">🔥</span><div><div style="font-weight:800;font-size:16px">'+n+' jours d\'affilée</div><div class="sub">Continue, ne casse pas la série !</div></div></div>'; }
+function scrProgress(){
+  var tb='<div class="tbar"><button class="ic" onclick="go(\'dash\')"><i class="ti ti-chevron-left"></i></button><h2 style="font-size:19px">Ma progression</h2><span style="width:38px"></span></div>';
+  var streak=computeStreak();
+  var doneWk=(S.history||[]).filter(function(w){return w.status==='realisee';}).length;
+  var w=S.weights||[]; var lastW=w.length?Number(w[w.length-1].weight).toFixed(1)+' kg':'—';
+  var top='<div class="row" style="gap:8px;margin-bottom:12px"><div class="card flat" style="flex:1;margin:0;text-align:center;padding:12px"><div class="big" style="font-size:22px;color:var(--accent)">'+streak+'</div><div class="label">Jours d\'affilée</div></div><div class="card flat" style="flex:1;margin:0;text-align:center;padding:12px"><div class="big" style="font-size:22px;color:var(--green)">'+doneWk+'</div><div class="label">Séances faites</div></div><div class="card flat" style="flex:1;margin:0;text-align:center;padding:12px"><div class="big" style="font-size:22px;color:var(--accent)">'+coreLevel()+' / '+hiitLevel()+'</div><div class="label">Niv. abdos / HIIT</div></div></div>';
+  var weightCard=(w.length>=2)?'<div class="card"><div class="label" style="margin-bottom:6px">Poids ('+lastW+')</div>'+weightSVG(w)+'</div>':'';
+  var prs=prList().slice(0,6);
+  var recCard=prs.length?'<div class="label" style="margin:8px 2px 8px">Records — charges</div><div class="card" style="padding:4px 14px">'+prs.map(function(p){ return '<div class="ath"><div class="m"><div class="nm">'+esc(p.name)+'</div></div><span style="font-weight:800;color:var(--accent)">'+p.load+' kg</span></div>'; }).join('')+'</div>':'';
+  var tr=testRecords(); var tk=Object.keys(tr);
+  var testCard=tk.length?'<div class="label" style="margin:14px 2px 8px">Records — tests</div><div class="card" style="padding:4px 14px">'+tk.map(function(k){ var x=tr[k]; return '<div class="ath"><div class="m"><div class="nm">'+esc(TEST_LABELS[k]||k)+'</div></div><span style="font-weight:800;color:var(--green)">'+esc(x.value)+' '+(TEST_UNITS[k]||'')+'</span></div>'; }).join('')+'</div>':'';
+  var empty=(!prs.length&&!tk.length&&w.length<2)?'<div class="card flat" style="text-align:center;padding:20px"><div class="sub">Fais tes premières séances, check-ins et tests : ta progression s\'affichera ici.</div></div>':'';
+  return tb+'<div class="banner" style="background:var(--accent-soft)"><i class="ti ti-trending-up" style="color:var(--accent)"></i><div class="x" style="color:#1742a5">Ton parcours en un coup d\'œil : série, séances, poids, records et niveaux.</div></div>'+top+weightCard+recCard+testCard+empty;
+}
 function motivPhrase(d){
   if(d>=7) return 'Content de te revoir ! On repart en douceur, sans culpabiliser — ton corps te remerciera.';
   if(d>=4) return 'Quelques jours sans séance, ce n\'est pas grave : l\'important, c\'est de repartir. Une mini-séance suffit pour relancer la machine.';
@@ -1890,7 +1922,7 @@ function render(extra){
   else if(S.screen==='onboarding'){ html=scrOnboarding(); nav.style.display='none'; }
   else if(S.screen==='result'){ html=scrResult(extra); nav.style.display='flex'; nav.innerHTML=navBar(); }
   else { nav.style.display='flex'; nav.innerHTML=navBar();
-    html = S.screen==='checkin'?scrCheckin():(S.screen==='workout'?scrWorkout():(S.screen==='profile'?scrProfile():(S.screen==='genopts'?scrGenOptions():(S.screen==='charges'?scrCharges():(S.screen==='calendar'?scrCalendar():(S.screen==='coach'?scrCoach():(S.screen==='coachDetail'?scrCoachDetail():(S.screen==='nutrition'?scrNutrition():(S.screen==='runs'?scrRuns():(S.screen==='badges'?scrBadges():(S.screen==='feedback'?scrFeedback():(S.screen==='comps'?scrComps():(S.screen==='assistant'?scrAssistant():(S.screen==='report'?scrReport():(S.screen==='runplanopts'?scrRunPlanOpts():(S.screen==='runsession'?scrRunSession():(S.screen==='newathlete'?scrNewAthlete():(S.screen==='athleteEdit'?scrAthleteEdit():(S.screen==='muscu'?scrMuscu():(S.screen==='muscuopts'?scrMuscuOpts():(S.screen==='muscuday'?scrMuscuDay():(S.screen==='exodetail'?scrExoDetail():(S.screen==='leaderboard'?scrLeaderboard():(S.screen==='groupsession'?scrGroupSession():(S.screen==='programopts'?scrProgramOpts():(S.screen==='tests'?scrTests():(S.screen==='goals'?scrGoals():(S.screen==='goaledit'?scrGoalEdit():(S.screen==='records'?scrRecords():(S.screen==='teams'?scrTeams():(S.screen==='hiit'?scrHiit():scrDash())))))))))))))))))))))))))))))));
+    html = S.screen==='checkin'?scrCheckin():(S.screen==='workout'?scrWorkout():(S.screen==='profile'?scrProfile():(S.screen==='genopts'?scrGenOptions():(S.screen==='charges'?scrCharges():(S.screen==='calendar'?scrCalendar():(S.screen==='coach'?scrCoach():(S.screen==='coachDetail'?scrCoachDetail():(S.screen==='nutrition'?scrNutrition():(S.screen==='runs'?scrRuns():(S.screen==='badges'?scrBadges():(S.screen==='feedback'?scrFeedback():(S.screen==='comps'?scrComps():(S.screen==='assistant'?scrAssistant():(S.screen==='report'?scrReport():(S.screen==='runplanopts'?scrRunPlanOpts():(S.screen==='runsession'?scrRunSession():(S.screen==='newathlete'?scrNewAthlete():(S.screen==='athleteEdit'?scrAthleteEdit():(S.screen==='muscu'?scrMuscu():(S.screen==='muscuopts'?scrMuscuOpts():(S.screen==='muscuday'?scrMuscuDay():(S.screen==='exodetail'?scrExoDetail():(S.screen==='leaderboard'?scrLeaderboard():(S.screen==='groupsession'?scrGroupSession():(S.screen==='programopts'?scrProgramOpts():(S.screen==='tests'?scrTests():(S.screen==='goals'?scrGoals():(S.screen==='goaledit'?scrGoalEdit():(S.screen==='records'?scrRecords():(S.screen==='teams'?scrTeams():(S.screen==='hiit'?scrHiit():(S.screen==='progress'?scrProgress():scrDash()))))))))))))))))))))))))))))))));
   }
   sc.innerHTML=html; sc.scrollTop=0; S.msg=null;
   const e=document.getElementById('i-email'); if(e) e.addEventListener('keydown',ev=>{if(ev.key==='Enter')document.getElementById('i-pass').focus();});
