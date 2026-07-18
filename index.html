@@ -305,7 +305,24 @@ function scrProfile(){
     selField('pf-equip','Matériel disponible',p.available_equipment,[['Salle de sport complète','Salle de sport complète'],['Salle de sport (basique)','Salle de sport (basique)'],['Matériel maison (haltères/barre)','Matériel maison (haltères/barre)'],['Petit matériel (élastiques, kettlebell)','Petit matériel (élastiques, kettlebell)'],['Sans matériel (poids du corps)','Sans matériel (poids du corps)']])+
     inField('pf-dur','Durée par séance (min)',p.session_duration_min,'number','60')+
     inField('pf-injuries','Blessures / restrictions actuelles',p.injuries_current,'text','Aucune, genou droit…')+
-    '<button class="btn outline" onclick="toggleTheme()" style="margin-bottom:9px">Mode sombre / clair</button><button class="btn outline" onclick="doExport()" style="margin-bottom:9px">Exporter mes données</button><button class="btn" id="b-profile" onclick="doSaveProfile()"><i class="ti ti-check"></i> Enregistrer mon profil</button>';
+    '<div class="label" style="margin:16px 2px 6px">PHYSIOLOGIE</div>'+
+    inField('pf-height','Taille (cm)',p.height_cm,'number','175')+
+    inField('pf-birth','Année de naissance',p.birth_year,'number','1990')+
+    inField('pf-exp','Expérience sportive (passé / ancienneté)',p.sport_experience,'text','ex : 3 ans de muscu, ancien foot…')+
+    '<div class="label" style="margin:16px 2px 6px">FRÉQUENCE & RÉCUPÉRATION</div>'+
+    inField('pf-freq','Séances par semaine visées',p.weekly_sessions,'number','4')+
+    inField('pf-rest','Jours de repos préférés',p.rest_days,'text','ex : mercredi, dimanche')+
+    selField('pf-activity','Activité au quotidien',p.activity_level,[['sedentaire','Métier assis / sédentaire'],['debout','Debout / beaucoup de marche'],['physique','Métier physique / manuel']])+
+    '<div class="label" style="margin:16px 2px 6px">PRÉFÉRENCES D\'ENTRAÎNEMENT</div>'+
+    inField('pf-areas','Zones à travailler en priorité',p.priority_areas,'text','ex : jambes, gainage, cardio')+
+    inField('pf-avoid','Exercices à éviter',p.avoided_exercises,'text','ex : sauts (genoux), course')+
+    '<div class="label" style="margin:16px 2px 6px">NUTRITION</div>'+
+    inField('pf-meals','Nombre de repas / jour',p.meals_per_day,'number','4')+
+    inField('pf-allergies','Allergies',p.allergies,'text','aucune, lactose…')+
+    inField('pf-diet','Régime particulier',p.special_diet,'text','aucun, végétarien, sans gluten…')+
+    inField('pf-dislikes','Aliments détestés',p.disliked_foods,'text','ex : brocoli, poisson')+
+    selField('pf-cook','Temps pour cuisiner',p.cooking_time,[['rapide','Rapide (peu de temps)'],['moyen','Moyen'],['aime','J\'aime cuisiner']])+
+    '<button class="btn outline" onclick="toggleTheme()" style="margin-top:8px;margin-bottom:9px">Mode sombre / clair</button><button class="btn outline" onclick="doExport()" style="margin-bottom:9px">Exporter mes données</button><button class="btn" id="b-profile" onclick="doSaveProfile()"><i class="ti ti-check"></i> Enregistrer mon profil</button>';
 }
 
 function scrGenOptions(){
@@ -1901,7 +1918,7 @@ async function doSaveCheckin(){
 }
 async function doSaveProfile(){
   const g=id=>{const e=document.getElementById(id);return e?e.value.trim():'';};
-  const upd = { first_name:g('pf-first')||null, sport_level:g('pf-level')||null, sex:g('pf-sex')||null, morphology:g('pf-morph')||null, available_equipment:g('pf-equip')||null, session_duration_min:parseInt(g('pf-dur'))||null, injuries_current:g('pf-injuries')||null };
+  const upd = { first_name:g('pf-first')||null, sport_level:g('pf-level')||null, sex:g('pf-sex')||null, morphology:g('pf-morph')||null, available_equipment:g('pf-equip')||null, session_duration_min:parseInt(g('pf-dur'))||null, injuries_current:g('pf-injuries')||null, height_cm:parseInt(g('pf-height'))||null, birth_year:parseInt(g('pf-birth'))||null, sport_experience:g('pf-exp')||null, weekly_sessions:parseInt(g('pf-freq'))||null, rest_days:g('pf-rest')||null, activity_level:g('pf-activity')||null, priority_areas:g('pf-areas')||null, avoided_exercises:g('pf-avoid')||null, meals_per_day:parseInt(g('pf-meals'))||null, allergies:g('pf-allergies')||null, special_diet:g('pf-diet')||null, disliked_foods:g('pf-dislikes')||null, cooking_time:g('pf-cook')||null };
   const btn=document.getElementById('b-profile'); btn.disabled=true; btn.innerHTML='<span class="spin"></span>';
   const { error } = await db.from('profiles').update(upd).eq('id', S.user.id);
   if(error){ S.msg={k:'err',t:'Erreur : '+error.message}; render(); return; }
