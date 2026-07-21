@@ -94,7 +94,7 @@ const S = { screen:'login', user:null, profile:null, todayCheckin:null, todaySco
 function ymd(d){ return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2); }
 const today = () => ymd(new Date());
 /* Base d'aliments (valeurs pour 100 g) : [nom, kcal, protéines, glucides, lipides] */
-const FOODS=[['Poulet (blanc)',165,31,0,3.6],['Dinde (escalope)',135,29,0,1],['Bœuf haché 5%',137,21,0,5],['Steak haché 15%',220,20,0,15],['Jambon blanc',107,18,1,3.5],['Saumon',208,20,0,13],['Thon (nature)',116,26,0,1],['Œuf entier',143,13,1.1,10],['Blanc d\'œuf',52,11,0.7,0.2],['Riz cuit',130,2.7,28,0.3],['Riz basmati cuit',121,3,25,0.4],['Pâtes cuites',131,5,25,1.1],['Pomme de terre',87,2,20,0.1],['Patate douce',86,1.6,20,0.1],['Quinoa cuit',120,4.4,21,1.9],['Flocons d\'avoine',389,17,66,7],['Pain complet',247,13,41,3.4],['Pain de mie',265,9,49,3.3],['Lentilles cuites',116,9,20,0.4],['Haricots rouges',127,9,22,0.5],['Pois chiches',164,9,27,2.6],['Yaourt nature',61,3.5,4.7,3.3],['Yaourt grec',59,10,3.6,0.4],['Fromage blanc 0%',47,8,4,0.2],['Skyr',63,11,4,0.2],['Lait demi-écrémé',46,3.3,5,1.6],['Comté',410,27,0,34],['Mozzarella',280,22,2.2,17],['Fromage râpé',380,25,1,30],['Amandes',579,21,22,50],['Beurre de cacahuète',588,25,20,50],['Banane',89,1.1,23,0.3],['Pomme',52,0.3,14,0.2],['Orange',47,0.9,12,0.1],['Fraises',32,0.7,7.7,0.3],['Avocat',160,2,9,15],['Brocoli',34,2.8,7,0.4],['Épinards',23,2.9,3.6,0.4],['Carotte',41,0.9,10,0.2],['Tomate',18,0.9,3.9,0.2],['Huile d\'olive',884,0,0,100],['Beurre',717,0.9,0.1,81],['Miel',304,0.3,82,0],['Sucre',400,0,100,0],['Chocolat noir',546,5,61,31],['Whey (poudre)',400,80,8,7]];
+const FOODS=[['Poulet (blanc)',165,31,0,3.6],['Dinde (escalope)',135,29,0,1],['Bœuf haché 5%',137,21,0,5],['Steak haché 15%',220,20,0,15],['Jambon blanc',107,18,1,3.5],['Saumon',208,20,0,13],['Thon (nature)',116,26,0,1],['Œuf entier',143,13,1.1,10],['Blanc d\'œuf',52,11,0.7,0.2],['Riz cuit',130,2.7,28,0.3],['Riz basmati cuit',121,3,25,0.4],['Pâtes cuites',131,5,25,1.1],['Pomme de terre',87,2,20,0.1],['Patate douce',86,1.6,20,0.1],['Quinoa cuit',120,4.4,21,1.9],['Flocons d\'avoine',389,17,66,7],['Pain complet',247,13,41,3.4],['Pain de mie',265,9,49,3.3],['Lentilles cuites',116,9,20,0.4],['Haricots rouges',127,9,22,0.5],['Pois chiches',164,9,27,2.6],['Yaourt nature',61,3.5,4.7,3.3],['Yaourt grec',59,10,3.6,0.4],['Fromage blanc 0%',47,8,4,0.2],['Skyr',63,11,4,0.2],['Lait demi-écrémé',46,3.3,5,1.6],['Comté',410,27,0,34],['Mozzarella',280,22,2.2,17],['Fromage râpé',380,25,1,30],['Amandes',579,21,22,50],['Beurre de cacahuète',588,25,20,50],['Banane',89,1.1,23,0.3],['Pomme',52,0.3,14,0.2],['Orange',47,0.9,12,0.1],['Fraises',32,0.7,7.7,0.3],['Avocat',160,2,9,15],['Brocoli',34,2.8,7,0.4],['Épinards',23,2.9,3.6,0.4],['Carotte',41,0.9,10,0.2],['Tomate',18,0.9,3.9,0.2],['Huile d\'olive',884,0,0,100],['Beurre',717,0.9,0.1,81],['Miel',304,0.3,82,0],['Sucre',400,0,100,0],['Chocolat noir',546,5,61,31],['Whey (poudre)',400,80,8,7],['Caséine (poudre)',370,78,9,5],['Barre protéinée',350,32,38,11],['Gainer (poudre)',380,25,58,4]];
 
 function computeScore(c){
   let s = (c.sleep + (10-c.fatigue) + (10-c.stress) + c.motivation)/4;
@@ -701,13 +701,17 @@ function scrNutrition(){
     trackBar('Glucides (g)',tot.carbs,n.carbs,'var(--green)')+
     trackBar('Lipides (g)',tot.fat,n.fat,'var(--amber)')+'</div>';
   var mode=S.foodMode||'simple';
-  var seg='<div class="seg"><button class="'+(mode==='simple'?'on':'')+'" onclick="setFoodMode(\'simple\')">Aliment</button><button class="'+(mode==='compose'?'on':'')+'" onclick="setFoodMode(\'compose\')">Menu composé (IA)</button></div>';
+  var seg='<div class="seg"><button class="'+(mode==='simple'?'on':'')+'" onclick="setFoodMode(\'simple\')">Aliment</button><button class="'+(mode==='manuel'?'on':'')+'" onclick="setFoodMode(\'manuel\')">Manuel</button><button class="'+(mode==='compose'?'on':'')+'" onclick="setFoodMode(\'compose\')">IA texte</button><button class="'+(mode==='photo'?'on':'')+'" onclick="setFoodMode(\'photo\')">IA photo</button></div>';
   var body;
   if(mode==='compose'){
     body='<textarea id="fd-compose" class="in" style="min-height:70px;resize:vertical" placeholder="Ex : 150 g de poulet, 100 g de riz, 1 yaourt grec"></textarea><button class="btn" onclick="doAIMacros()" style="margin-top:9px"><i class="ti ti-sparkles"></i> Estimer les macros et ajouter</button>';
+  } else if(mode==='manuel'){
+    body='<input id="fd-name" class="in" type="text" placeholder="Nom (ex : Whey — 1 dose 30 g)"><div class="row" style="gap:6px;margin-top:7px"><input id="fd-cal" class="in" type="number" placeholder="kcal" style="margin-top:0"><input id="fd-p" class="in" type="number" placeholder="P" style="margin-top:0"><input id="fd-c" class="in" type="number" placeholder="G" style="margin-top:0"><input id="fd-f" class="in" type="number" placeholder="L" style="margin-top:0"></div><div class="sub" style="font-size:11px;margin:8px 2px">Lis l\'étiquette (whey, barre, complément…) et saisis les valeurs pour la portion que tu prends.</div><button class="btn" onclick="doAddFood2()" style="margin-top:6px">Ajouter au suivi</button>';
+  } else if(mode==='photo'){
+    body='<label class="btn outline" style="cursor:pointer"><i class="ti ti-camera"></i> Prendre / choisir une photo<input id="fd-photo" type="file" accept="image/*" capture="environment" onchange="doPhotoMacros()" style="display:none"></label><div class="sub" style="font-size:11px;margin:8px 2px">Photographie ton repas : l\'IA estime calories et macros (approximatif). Idéal quand tu ne connais pas les valeurs.</div><div id="fd-photo-status" class="sub" style="color:var(--accent);font-weight:700"></div>';
   } else {
     var fopts='<option value="">— choisir un aliment —</option>'+FOODS.map(function(f,i){return '<option value="'+i+'">'+esc(f[0])+'</option>';}).join('');
-    body='<select class="in" id="fd-food">'+fopts+'</select><input id="fd-qty" class="in" type="number" placeholder="Quantité (g)"><div class="sub" style="font-size:11px;margin:8px 2px">Ou, si l\'aliment n\'est pas dans la liste, saisie manuelle :</div><input id="fd-name" class="in" type="text" placeholder="Nom (manuel)"><div class="row" style="gap:6px;margin-top:7px"><input id="fd-cal" class="in" type="number" placeholder="kcal" style="margin-top:0"><input id="fd-p" class="in" type="number" placeholder="P" style="margin-top:0"><input id="fd-c" class="in" type="number" placeholder="G" style="margin-top:0"><input id="fd-f" class="in" type="number" placeholder="L" style="margin-top:0"></div><button class="btn" onclick="doAddFood2()" style="margin-top:10px">Ajouter au suivi</button>';
+    body='<select class="in" id="fd-food">'+fopts+'</select><input id="fd-qty" class="in" type="number" placeholder="Quantité (g)"><div class="sub" style="font-size:11px;margin:8px 2px">Astuce : la whey et les compléments sont dans la liste. Sinon, onglet « Manuel ».</div><button class="btn" onclick="doAddFood2()" style="margin-top:6px">Ajouter au suivi</button>';
   }
   var addForm='<div class="card"><div class="flabel" style="margin-bottom:7px">Ajouter au suivi</div>'+seg+body+'</div>';
   var entries=S.foodLog||[];
@@ -761,6 +765,18 @@ async function doAIMacros(){
     var mac=(r.data&&r.data.macros)||null;
     if(!mac){ var errd=(r.data&&r.data.error)||(r.error&&r.error.message)||'estimation impossible'; S.msg={k:'err',t:'IA : '+errd}; render(); return; }
     await addFoodRow(txt.slice(0,80), Math.round(mac.calories||0), Math.round(mac.protein||0), Math.round(mac.carbs||0), Math.round(mac.fat||0));
+  }catch(e){ S.msg={k:'err',t:'Erreur : '+(e.message||e)}; render(); }
+}
+async function doPhotoMacros(){
+  var el=document.getElementById('fd-photo'); var file=el&&el.files?el.files[0]:null; if(!file) return;
+  var st=document.getElementById('fd-photo-status'); if(st) st.textContent='Analyse de la photo…';
+  try{
+    var b64=await new Promise(function(res,rej){ var rd=new FileReader(); rd.onload=function(){ res(String(rd.result).split(',')[1]||''); }; rd.onerror=rej; rd.readAsDataURL(file); });
+    if(!b64){ S.msg={k:'err',t:'Image illisible, réessaie.'}; render(); return; }
+    var r=await invokeFn('ai-coach',{mode:'photo', image:b64, mime:file.type||'image/jpeg'});
+    var mac=(r.data&&r.data.macros)||null;
+    if(!mac){ var errd=(r.data&&r.data.error)||(r.error&&r.error.message)||'estimation impossible'; S.msg={k:'err',t:'IA : '+errd}; render(); return; }
+    await addFoodRow('Repas (photo)', Math.round(mac.calories||0), Math.round(mac.protein||0), Math.round(mac.carbs||0), Math.round(mac.fat||0));
   }catch(e){ S.msg={k:'err',t:'Erreur : '+(e.message||e)}; render(); }
 }
 async function doGenNutrition(){
