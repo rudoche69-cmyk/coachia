@@ -244,7 +244,7 @@ function toolsBlock(){
   var p=S.profile||{};
   var train=tile('ti-wand','Programme complet','programopts')+tile('ti-barbell','Muscu','muscu')+tile('ti-run','Course / Natation','runs')+tile('ti-bolt','HIIT express','hiit');
   var suivi=tile('ti-trending-up','Progression','progress')+tile('ti-chart-line','Charges','charges')+tile('ti-award','Records','records')+tile('ti-clipboard-check','Tests','tests')+tile('ti-target','Objectifs','goals')+tile('ti-trophy','Compétitions','comps');
-  var moti=tile('ti-medal','Badges','badges')+(p.role==='admin'?tile('ti-crown','Classement','leaderboard'):'');
+  var moti=tile('ti-military-rank','Mon grade','ranks')+tile('ti-medal','Badges','badges')+(p.role==='admin'?tile('ti-crown','Classement','leaderboard'):'');
   var plus=tile('ti-robot','Assistant IA','assistant')+tile('ti-file-text','Rapport','report')+tile('ti-first-aid-kit','Je me suis blessé','injury')+tile('ti-message-circle','Avis','feedback');
   return toolGroup('M\'entraîner',train)+toolGroup('Ma nutrition',tile('ti-salad','Nutrition','nutrition'))+toolGroup('Mon suivi',suivi)+toolGroup('Motivation',moti)+toolGroup('Plus',plus);
 }
@@ -267,7 +267,7 @@ function scrDash(){
   }
   const w = S.weights; const lastW = w.length ? Number(w[w.length-1].weight).toFixed(1)+' kg' : '—';
   return '<div class="tbar"><div><div class="t">'+new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'})+'</div><h2>Bonjour, '+esc(displayName())+'</h2></div><button class="ic" onclick="go(\'profile\')" title="Mon profil"><i class="ti ti-user"></i></button></div>'+
-    (S.offline?'<div class="banner" style="background:var(--amber-bg)"><i class="ti ti-wifi-off" style="color:var(--amber)"></i><div class="x" style="color:#7a4a12">Mode hors-ligne — voici les données de ta dernière connexion. Reconnecte-toi pour synchroniser.</div></div>':'')+(restAdviceCard()||topAlert())+coachNoteCard()+checkinBlock()+heroCard()+homeShortcuts()+streakCard()+upcomingCard()+coachEntryCard()+'<button class="btn outline" onclick="toggleTools()" style="margin-top:14px"><i class="ti '+(S.showTools?'ti-chevron-up':'ti-layout-grid')+'"></i> '+(S.showTools?'Masquer les outils':'Tous mes outils')+'</button>'+toolsBlock();
+    (S.offline?'<div class="banner" style="background:var(--amber-bg)"><i class="ti ti-wifi-off" style="color:var(--amber)"></i><div class="x" style="color:#7a4a12">Mode hors-ligne — voici les données de ta dernière connexion. Reconnecte-toi pour synchroniser.</div></div>':'')+(restAdviceCard()||topAlert())+coachNoteCard()+checkinBlock()+heroCard()+homeShortcuts()+rankCard()+streakCard()+upcomingCard()+coachEntryCard()+'<button class="btn outline" onclick="toggleTools()" style="margin-top:14px"><i class="ti '+(S.showTools?'ti-chevron-up':'ti-layout-grid')+'"></i> '+(S.showTools?'Masquer les outils':'Tous mes outils')+'</button>'+toolsBlock();
 }
 function scrWorkout(){
   if(S.generating){ return '<div class="tbar"><button class="ic" onclick="go(\'dash\')"><i class="ti ti-chevron-left"></i></button><h2 style="font-size:19px">Séance du jour</h2><span style="width:38px"></span></div><div class="center" style="min-height:380px"><div class="spin" style="border-color:var(--accent);border-top-color:transparent;width:30px;height:30px"></div><div>L\'IA génère ta séance…</div><div class="sub">Quelques secondes</div></div>'; }
@@ -855,6 +855,48 @@ async function doSaveRun(){
   try{ await db.from('runs').insert({athlete_id:S.user.id, date:today(), distance_km:km, duration_min:mn, notes:note}); await loadAll(); S.msg={k:'ok',t:'Sortie enregistrée !'}; }
   catch(e){ S.msg={k:'err',t:'Erreur : '+(e.message||e)}; }
   render();
+}
+/* ===== XP & GRADES (gamification façon CoD) ===== */
+var RANKS=[
+  {min:1,name:'Recrue',col:'#6B7280'},{min:5,name:'Soldat',col:'#16A34A'},{min:10,name:'Caporal',col:'#0EA5E9'},
+  {min:15,name:'Sergent',col:'#3B5BFF'},{min:20,name:'Adjudant',col:'#6D28D9'},{min:25,name:'Lieutenant',col:'#DB2777'},
+  {min:30,name:'Capitaine',col:'#E08A2B'},{min:35,name:'Commandant',col:'#F97316'},{min:40,name:'Colonel',col:'#DC2626'},
+  {min:45,name:'Général',col:'#B45309'},{min:50,name:'Prestige',col:'#7C3AED'}
+];
+function levelFromXP(xp){ var lvl=1, need=100, acc=0; while(xp>=acc+need && lvl<60){ acc+=need; lvl++; need=100+(lvl-1)*25; } return {level:lvl, into:xp-acc, need:need}; }
+function rankFromLevel(l){ var r=RANKS[0]; for(var i=0;i<RANKS.length;i++){ if(l>=RANKS[i].min) r=RANKS[i]; } return r; }
+function lsInt(k){ try{ return parseInt(localStorage.getItem(k)||'0')||0; }catch(_){ return 0; } }
+function computeXP(){
+  var xp=0;
+  (S.history||[]).forEach(function(w){ if(w.status==='realisee') xp+=50; });
+  if(S.muscu&&S.muscu.days) S.muscu.days.forEach(function(d){ if(d.done) xp+=50; });
+  if(S.runPlan&&S.runPlan.weeks) S.runPlan.weeks.forEach(function(w){ w.sessions.forEach(function(s){ if(s.done) xp+=50; }); });
+  (S.runs||[]).forEach(function(){ xp+=40; });
+  xp+=(S.checkinCount||0)*10;
+  xp+=(computeStreak()||0)*15;
+  (S.tests||[]).forEach(function(){ xp+=30; });
+  xp+=lsInt('athlon_hiit_done')*30; xp+=lsInt('athlon_core_done')*20; xp+=lsInt('athlon_swim_done')*40;
+  try{ getGoals(true).forEach(function(g){ (g.targets||[]).forEach(function(tt){ var pr=goalProgress(tt,true); if(pr&&pr.pct!=null&&pr.pct>=100) xp+=100; }); }); }catch(_){}
+  return Math.round(xp);
+}
+function rankInfo(){ var xp=computeXP(); var lv=levelFromXP(xp); var r=rankFromLevel(lv.level); return {xp:xp, level:lv.level, into:lv.into, need:lv.need, rank:r.name, col:r.col, prestige:lv.level>=50}; }
+function rankCard(){
+  var r=rankInfo(); var pct=r.need?Math.min(100,Math.round(r.into/r.need*100)):0;
+  return '<div class="card" onclick="go(\'ranks\')" style="cursor:pointer;background:linear-gradient(135deg,'+r.col+' 0%,#0B0B0F 135%);border:none;padding:15px;color:#fff">'+
+    '<div style="display:flex;align-items:center;gap:12px"><div style="width:46px;height:46px;border-radius:12px;background:rgba(255,255,255,.16);display:flex;align-items:center;justify-content:center"><i class="ti ti-military-rank" style="font-size:24px;color:#fff"></i></div>'+
+    '<div style="flex:1"><div style="font-size:11px;font-weight:800;letter-spacing:.06em;opacity:.85">GRADE · NIVEAU '+r.level+'</div><div style="font-size:19px;font-weight:800">'+esc(r.rank)+(r.prestige?' ⭐':'')+'</div></div>'+
+    '<div style="text-align:right"><div style="font-size:17px;font-weight:800">'+r.xp+'</div><div style="font-size:10px;opacity:.85;font-weight:700">XP</div></div></div>'+
+    '<div style="height:8px;border-radius:999px;background:rgba(255,255,255,.22);margin-top:11px;overflow:hidden"><i style="display:block;height:100%;width:'+pct+'%;background:#fff"></i></div>'+
+    '<div style="font-size:11px;opacity:.85;margin-top:5px;font-weight:600">'+r.into+' / '+r.need+' XP → niveau '+(r.level+1)+'</div></div>';
+}
+function scrRanks(){
+  var r=rankInfo(); var pct=r.need?Math.min(100,Math.round(r.into/r.need*100)):0;
+  var tb='<div class="tbar"><button class="ic" onclick="go(\'dash\')"><i class="ti ti-chevron-left"></i></button><h2 style="font-size:19px">Mon grade</h2><span style="width:38px"></span></div>';
+  var hero='<div class="card" style="background:linear-gradient(135deg,'+r.col+' 0%,#0B0B0F 135%);border:none;color:#fff;text-align:center;padding:22px"><div style="width:64px;height:64px;border-radius:16px;background:rgba(255,255,255,.16);display:flex;align-items:center;justify-content:center;margin:0 auto 10px"><i class="ti ti-military-rank" style="font-size:34px;color:#fff"></i></div><div style="font-size:12px;font-weight:800;letter-spacing:.06em;opacity:.85">NIVEAU '+r.level+(r.prestige?' · PRESTIGE ⭐':'')+'</div><div style="font-size:26px;font-weight:800;margin:2px 0 10px">'+esc(r.rank)+'</div><div style="height:9px;border-radius:999px;background:rgba(255,255,255,.22);overflow:hidden"><i style="display:block;height:100%;width:'+pct+'%;background:#fff"></i></div><div style="font-size:12px;opacity:.9;margin-top:6px;font-weight:600">'+r.into+' / '+r.need+' XP → niveau '+(r.level+1)+' · '+r.xp+' XP au total</div></div>';
+  var brk=[['Séance validée','+50 XP'],['Check-in du jour','+10 XP'],['Série (par jour d\'affilée)','+15 XP'],['HIIT / abdos','+20 à 30 XP'],['Séance natation','+40 XP'],['Objectif atteint','+100 XP']];
+  var brkHtml='<div class="label" style="margin:16px 2px 8px">Comment gagner de l\'XP</div><div class="card" style="padding:6px 14px">'+brk.map(function(b){ return '<div class="ex"><div class="n"><i class="ti ti-bolt" style="color:var(--accent)"></i></div><div class="m"><div class="nm">'+b[0]+'</div><div class="ds">'+b[1]+'</div></div></div>'; }).join('')+'</div>';
+  var ladder='<div class="label" style="margin:16px 2px 8px">Les grades</div><div class="card" style="padding:6px 14px">'+RANKS.map(function(rk){ var cur=r.rank===rk.name; return '<div class="ex" style="'+(cur?'background:var(--accent-soft);border-radius:10px':'')+'"><div class="n" style="background:'+rk.col+';color:#fff"><i class="ti ti-military-rank"></i></div><div class="m"><div class="nm">'+rk.name+(cur?' — toi':'')+'</div><div class="ds">Niveau '+rk.min+'+</div></div>'+(cur?'<i class="ti ti-check" style="color:var(--accent)"></i>':'')+'</div>'; }).join('')+'</div>';
+  return tb+hero+brkHtml+ladder;
 }
 function computeBadges(){
   var done=(S.history||[]).filter(function(w){return w.status==='realisee';}).length;
@@ -2216,7 +2258,7 @@ function render(extra){
   else if(S.screen==='onboarding'){ html=scrOnboarding(); nav.style.display='none'; }
   else if(S.screen==='result'){ html=scrResult(extra); nav.style.display='flex'; nav.innerHTML=navBar(); }
   else { nav.style.display='flex'; nav.innerHTML=navBar();
-    html = S.screen==='checkin'?scrCheckin():(S.screen==='workout'?scrWorkout():(S.screen==='profile'?scrProfile():(S.screen==='genopts'?scrGenOptions():(S.screen==='charges'?scrCharges():(S.screen==='calendar'?scrCalendar():(S.screen==='coach'?scrCoach():(S.screen==='coachDetail'?scrCoachDetail():(S.screen==='nutrition'?scrNutrition():(S.screen==='runs'?scrRuns():(S.screen==='badges'?scrBadges():(S.screen==='feedback'?scrFeedback():(S.screen==='comps'?scrComps():(S.screen==='assistant'?scrAssistant():(S.screen==='report'?scrReport():(S.screen==='runplanopts'?scrRunPlanOpts():(S.screen==='runsession'?scrRunSession():(S.screen==='newathlete'?scrNewAthlete():(S.screen==='athleteEdit'?scrAthleteEdit():(S.screen==='muscu'?scrMuscu():(S.screen==='muscuopts'?scrMuscuOpts():(S.screen==='muscuday'?scrMuscuDay():(S.screen==='exodetail'?scrExoDetail():(S.screen==='leaderboard'?scrLeaderboard():(S.screen==='groupsession'?scrGroupSession():(S.screen==='programopts'?scrProgramOpts():(S.screen==='tests'?scrTests():(S.screen==='goals'?scrGoals():(S.screen==='goaledit'?scrGoalEdit():(S.screen==='records'?scrRecords():(S.screen==='teams'?scrTeams():(S.screen==='hiit'?scrHiit():(S.screen==='progress'?scrProgress():(S.screen==='injury'?scrInjury():scrDash())))))))))))))))))))))))))))))))));
+    html = S.screen==='checkin'?scrCheckin():(S.screen==='workout'?scrWorkout():(S.screen==='profile'?scrProfile():(S.screen==='genopts'?scrGenOptions():(S.screen==='charges'?scrCharges():(S.screen==='calendar'?scrCalendar():(S.screen==='coach'?scrCoach():(S.screen==='coachDetail'?scrCoachDetail():(S.screen==='nutrition'?scrNutrition():(S.screen==='runs'?scrRuns():(S.screen==='badges'?scrBadges():(S.screen==='feedback'?scrFeedback():(S.screen==='comps'?scrComps():(S.screen==='assistant'?scrAssistant():(S.screen==='report'?scrReport():(S.screen==='runplanopts'?scrRunPlanOpts():(S.screen==='runsession'?scrRunSession():(S.screen==='newathlete'?scrNewAthlete():(S.screen==='athleteEdit'?scrAthleteEdit():(S.screen==='muscu'?scrMuscu():(S.screen==='muscuopts'?scrMuscuOpts():(S.screen==='muscuday'?scrMuscuDay():(S.screen==='exodetail'?scrExoDetail():(S.screen==='leaderboard'?scrLeaderboard():(S.screen==='groupsession'?scrGroupSession():(S.screen==='programopts'?scrProgramOpts():(S.screen==='tests'?scrTests():(S.screen==='goals'?scrGoals():(S.screen==='goaledit'?scrGoalEdit():(S.screen==='records'?scrRecords():(S.screen==='teams'?scrTeams():(S.screen==='hiit'?scrHiit():(S.screen==='progress'?scrProgress():(S.screen==='injury'?scrInjury():(S.screen==='ranks'?scrRanks():scrDash()))))))))))))))))))))))))))))))))));
   }
   sc.innerHTML=html; sc.scrollTop=0; S.msg=null;
   const e=document.getElementById('i-email'); if(e) e.addEventListener('keydown',ev=>{if(ev.key==='Enter')document.getElementById('i-pass').focus();});
