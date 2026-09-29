@@ -242,7 +242,7 @@ function toolGroup(title,inner){ if(!inner) return ''; return '<div class="label
 function toolsBlock(){
   if(!S.showTools) return '';
   var p=S.profile||{};
-  var train=tile('ti-wand','Programme complet','programopts')+tile('ti-barbell','Muscu','muscu')+tile('ti-run','Course','runs')+tile('ti-swimming','Natation','swim')+tile('ti-bolt','HIIT express','hiit');
+  var train=tile('ti-wand','Programme complet','programopts')+tile('ti-barbell','Muscu','muscu')+tile('ti-run','Course / Natation','runs')+tile('ti-bolt','HIIT express','hiit');
   var suivi=tile('ti-trending-up','Progression','progress')+tile('ti-chart-line','Charges','charges')+tile('ti-award','Records','records')+tile('ti-clipboard-check','Tests','tests')+tile('ti-target','Objectifs','goals')+tile('ti-trophy','Compétitions','comps');
   var moti=tile('ti-medal','Badges','badges')+(p.role==='admin'?tile('ti-crown','Classement','leaderboard'):'');
   var plus=tile('ti-robot','Assistant IA','assistant')+tile('ti-file-text','Rapport','report')+tile('ti-first-aid-kit','Je me suis blessé','injury')+tile('ti-message-circle','Avis','feedback');
@@ -317,7 +317,7 @@ function inField(id,label,cur,type,ph){
 }
 function scrProfile(){
   const p = S.profile||{};
-  const goals=['Hyrox Solo','Hyrox Double','Football','Running','Courir plus vite','Trail','Marathon','Semi-marathon','Spartan Race','Cross Training','Musculation','Force','Hypertrophie','Explosivité','Perte de poids','Recomposition corporelle','Prise de masse','Prise de masse musculaire','Santé','Réathlétisation','Retour de blessure','Préparation concours','Préparation militaire'].map(g=>[g,g]);
+  const goals=['Hyrox Solo','Hyrox Double','Football','Running','Courir plus vite','Trail','Marathon','Semi-marathon','Natation','Spartan Race','Cross Training','Musculation','Force','Hypertrophie','Explosivité','Perte de poids','Recomposition corporelle','Prise de masse','Prise de masse musculaire','Santé','Réathlétisation','Retour de blessure','Préparation concours','Préparation militaire'].map(g=>[g,g]);
   return '<div class="tbar"><button class="ic" onclick="go(\'dash\')"><i class="ti ti-chevron-left"></i></button><h2 style="font-size:19px">Mon profil</h2><button class="ic" onclick="doLogout()" title="Se déconnecter"><i class="ti ti-logout"></i></button></div>'+
     (S.msg?'<div class="msg '+S.msg.k+'">'+S.msg.t+'</div>':'')+
     inField('pf-first','Prénom',p.first_name,'text','Ton prénom')+
@@ -818,7 +818,8 @@ async function doGenNutrition(){
 function menuCard(label,target){ return '<div class="card" onclick="go(\''+target+'\')" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between"><span style="font-weight:700">'+label+'</span><span style="color:var(--faint);font-size:18px">›</span></div>'; }
 function tile(ic,label,target){ return '<div class="tile" onclick="go(\''+target+'\')"><i class="ti '+ic+'"></i><span class="tl">'+label+'</span></div>'; }
 function scrRuns(){
-  var tb='<div class="tbar"><button class="ic" onclick="go(\'dash\')"><i class="ti ti-chevron-left"></i></button><h2 style="font-size:19px">Sorties course</h2><span style="width:38px"></span></div>';
+  var swim=S.runPlan&&S.runPlan.discipline==='natation';
+  var tb='<div class="tbar"><button class="ic" onclick="go(\'dash\')"><i class="ti ti-chevron-left"></i></button><h2 style="font-size:19px">'+(swim?'Natation':'Sorties course')+'</h2><span style="width:38px"></span></div>';
   var msg=S.msg?'<div class="msg '+S.msg.k+'">'+S.msg.t+'</div>':'';
   if(!S.runPlan){
     var intro='<div class="card"><div style="font-weight:700;margin-bottom:4px">Mon plan course 🏃</div><div class="sub" style="margin-bottom:12px">Un programme progressif, semaine par semaine, où chaque séance est détaillée pas à pas (échauffement, déroulé, conseils). Parfait pour débuter sans se blesser.</div><button class="btn" onclick="go(\'runplanopts\')">Créer mon plan course</button></div>';
@@ -826,13 +827,13 @@ function scrRuns(){
   }
   var pr=runProgress(); var cw=currentRunWeek();
   var pct=pr.total?Math.round(pr.done/pr.total*100):0;
-  var headCard='<div class="card"><div class="row" style="margin-bottom:6px"><div class="label">'+esc(runGoalLabel(S.runPlan.goal))+'</div><span class="pill o">'+S.runPlan.perWeek+'×/sem</span></div><div class="row"><span class="sub">Progression</span><span class="sub" style="font-weight:700;color:var(--ink)">'+pr.done+' / '+pr.total+' séances</span></div><div style="height:8px;border-radius:999px;background:var(--bg);margin-top:8px;overflow:hidden"><i style="display:block;height:100%;width:'+pct+'%;background:var(--accent)"></i></div></div>';
+  var headCard='<div class="card"><div class="row" style="margin-bottom:6px"><div class="label">'+(swim?'Programme natation 🏊':esc(runGoalLabel(S.runPlan.goal)))+'</div><span class="pill o">'+S.runPlan.perWeek+'×/sem</span></div><div class="row"><span class="sub">Progression</span><span class="sub" style="font-weight:700;color:var(--ink)">'+pr.done+' / '+pr.total+' séances</span></div><div style="height:8px;border-radius:999px;background:var(--bg);margin-top:8px;overflow:hidden"><i style="display:block;height:100%;width:'+pct+'%;background:var(--accent)"></i></div></div>';
   var weeksHtml=S.runPlan.weeks.map(function(w,wi){
     var cur=wi===cw;
     var rows=w.sessions.map(function(s,si){
       var d=new Date(s.date+'T00:00:00'); var ds=isNaN(d)?s.date:d.toLocaleDateString('fr-FR',{weekday:'short',day:'numeric',month:'short'});
       var check=s.done?'<i class="ti ti-circle-check" style="color:var(--green);font-size:20px"></i>':'<i class="ti ti-chevron-right" style="color:var(--faint);font-size:18px"></i>';
-      return '<div class="ex" onclick="openRunSession('+wi+','+si+')" style="cursor:pointer"><div class="n" style="background:'+runTypeBg(s.t)+';color:'+runTypeCol(s.t)+'"><i class="ti ti-run"></i></div><div class="m"><div class="nm">'+ds+' · '+runTypeLabel(s.t)+'</div><div class="ds">'+esc(s.m)+'</div></div>'+check+'</div>';
+      return '<div class="ex" onclick="openRunSession('+wi+','+si+')" style="cursor:pointer"><div class="n" style="background:'+runTypeBg(s.t)+';color:'+runTypeCol(s.t)+'"><i class="ti '+sessIcon(s)+'"></i></div><div class="m"><div class="nm">'+ds+' · '+(s.swim?swimFocusLabel(s.focus):runTypeLabel(s.t))+'</div><div class="ds">'+esc(s.m)+'</div></div>'+check+'</div>';
     }).join('');
     return '<div class="card" style="padding:4px 14px'+(cur?';border:2px solid var(--accent)':'')+'"><div class="row" style="padding:10px 0 4px"><div class="label">Semaine '+w.n+' · '+esc(w.f)+'</div>'+(cur?'<span class="pill o">En cours</span>':'')+'</div>'+rows+'</div>';
   }).join('');
@@ -992,9 +993,10 @@ async function doReport(){
   S.reportLoading=false; render();
 }
 /* ===== PLAN COURSE (progressif, guidé pas à pas) ===== */
-function runTypeLabel(t){ return ({EF:'Endurance fondamentale',FRAC:'Fractionné',LONG:'Sortie longue',RECUP:'Récupération',MC:'Marche / course'})[t]||'Sortie'; }
+function runTypeLabel(t){ return ({EF:'Endurance fondamentale',FRAC:'Fractionné',LONG:'Sortie longue',RECUP:'Récupération',MC:'Marche / course',SWIM:'Natation'})[t]||'Sortie'; }
 function runTypeBg(t){ return t==='FRAC'?'var(--amber-bg)':(t==='LONG'?'var(--green-bg)':(t==='RECUP'?'var(--green-bg)':'var(--accent-soft)')); }
 function runTypeCol(t){ return t==='FRAC'?'var(--amber)':(t==='LONG'?'var(--green)':(t==='RECUP'?'var(--green)':'var(--accent)')); }
+function sessIcon(s){ return (s&&s.swim)?'ti-swimming':'ti-run'; }
 function runSessionBase(t){
   var b={
     EF:{wu:'5 min de marche rapide, puis 5 min de footing très lent. Termine par 3 montées de genoux et 3 talons-fesses.',cd:'5 min de marche + étirements doux (mollets, cuisses, ischios).',tip:'Allure « test de la parole » : tu dois pouvoir tenir une conversation en courant. Si tu es essoufflé, ralentis ou marche un peu, c’est normal.'},
@@ -1118,9 +1120,21 @@ function homeCardioPlan(t){
   if(isLong){ return { titre:'Sortie longue maison', dur:'~45–50 min', rounds:5, format:'5 tours EN CONTINU à allure facile (tu peux parler). Enchaîne les exercices sans t\'arrêter, repos seulement entre les tours.', wu:'8 min : marche active puis montées de genoux et talons-fesses souples.', ex:[['Step / montées sur une marche','2 min',0],['Marche rapide genoux hauts','90 s',0],['Jumping jacks lents','90 s',0],['Shadow boxing','2 min',0],['Fentes alternées','90 s',45]], cd:'5–8 min de marche + étirements longs.', note:'Reste en aisance respiratoire du début à la fin : c\'est du volume, pas de l\'intensité.' }; }
   return { titre:'Footing maison', dur:'~30 min', rounds:4, format:'4 tours EN CONTINU à intensité modérée (tu peux tenir une conversation). Enchaîne les exercices, repos entre les tours.', wu:'5 min : marche active, mobilité chevilles et hanches.', ex:[['Montées de genoux souples','90 s',0],['Jumping jacks','60 s',0],['Step sur une marche','90 s',0],['Talons-fesses','60 s',0],['Marche rapide sur place','90 s',30]], cd:'5 min de marche + étirements.', note:'Intensité « je peux tenir une conversation ». Sans impact : privilégie les montées de step aux sauts.' };
 }
+function scrSwimSessionView(w,s){
+  var sess=buildSwimSession(swimLevelFromProfile(), s.focus, 45, 25);
+  var d=new Date(s.date+'T00:00:00'); var ds=isNaN(d)?s.date:d.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'});
+  var tb='<div class="tbar"><button class="ic" onclick="go(\'runs\')"><i class="ti ti-chevron-left"></i></button><h2 style="font-size:18px">Natation · '+swimFocusLabel(s.focus)+'</h2><span style="width:38px"></span></div>';
+  var head='<div class="banner" style="background:var(--accent-soft)"><i class="ti ti-swimming" style="color:var(--accent)"></i><div class="x"><b style="color:var(--accent)">Semaine '+w.n+' · '+esc(w.f)+'</b><br><span style="color:var(--ink)">'+ds+' · bassin 25 m · ~'+sess.total+' m</span></div></div>';
+  var block=function(titre,ic,arr){ var rows=arr.map(function(x){ return '<div class="ex"><div class="n"><i class="ti '+ic+'"></i></div><div class="m"><div class="nm">'+esc(x.label)+(x.rest?' <span class="sub" style="font-weight:600">· '+esc(x.rest)+'</span>':'')+'</div><div class="ds">'+esc(x.detail)+'</div></div></div>'; }).join(''); return '<div class="label" style="margin:14px 2px 6px">'+titre+'</div><div class="card" style="padding:6px 14px">'+rows+'</div>'; };
+  var note='<div class="banner" style="background:var(--amber-bg)"><i class="ti ti-bulb" style="color:var(--amber)"></i><div class="x" style="color:#7a4a12">'+esc(sess.note)+'</div></div>';
+  var rest='<button class="btn outline" onclick="startRest(20)" style="margin-bottom:10px"><i class="ti ti-stopwatch"></i> Chrono de repos (20 s)</button>';
+  var btn=s.done?'<div class="banner" style="background:var(--green-bg)"><i class="ti ti-circle-check" style="color:var(--green)"></i><div class="x" style="color:var(--green)"><b>Séance faite — bravo !</b></div></div><button class="btn outline" onclick="doToggleRunDone()">Annuler « faite »</button>':'<button class="btn" onclick="doToggleRunDone()"><i class="ti ti-check"></i> Marquer comme faite</button>';
+  return tb+head+extConflictBanner(s.date)+block('Échauffement','ti-flame',sess.warm)+block('Corps de séance','ti-swimming',sess.main)+block('Retour au calme','ti-stretching',sess.cool)+note+rest+btn;
+}
 function scrRunSession(){
   var sel=S.selRun; if(!sel||!S.runPlan) return scrRuns();
   var w=S.runPlan.weeks[sel.w]; if(!w) return scrRuns(); var s=w.sessions[sel.s]; if(!s) return scrRuns();
+  if(s.swim) return scrSwimSessionView(w,s);
   var base=runSessionBase(s.t);
   var d=new Date(s.date+'T00:00:00'); var ds=isNaN(d)?s.date:d.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'});
   var tb='<div class="tbar"><button class="ic" onclick="go(\'runs\')"><i class="ti ti-chevron-left"></i></button><h2 style="font-size:18px">'+runTypeLabel(s.t)+'</h2><span style="width:38px"></span></div>';
@@ -1226,7 +1240,7 @@ function restForExo(name){ var n=(name||'').toLowerCase();
 function goalScheme(goal){ var g=(goal||'').toLowerCase();
   if(/force|puissance|explosiv|powerlif|1rm|militaire|concours/.test(g)) return 'force';
   if(/hyrox|cross|spartan|crossfit|wod|fonctionnel|obstacle/.test(g)) return 'hyrox';
-  if(/run|cours|courir|foot|trail|marathon|semi|vma|endurance|cardio|vitesse/.test(g)) return 'endurance';
+  if(/run|cours|courir|foot|trail|marathon|semi|vma|endurance|cardio|vitesse|natation|nage|swim/.test(g)) return 'endurance';
   if(/perte|sèche|seche|maigrir|mince|santé|sante|forme|réathl|reathl|blessure|recompos/.test(g)) return 'forme';
   if(/masse|hypertroph|muscu|musculation/.test(g)) return 'masse';
   return 'masse';
@@ -1515,9 +1529,10 @@ async function doSwapExo(ai){
 }
 /* ===== PROGRAMME COMPLET (muscu + course couplés selon l'objectif) ===== */
 function weekSlots(n){ return [[0],[0,3],[0,2,4],[0,2,4,6],[0,1,3,4,6],[0,1,2,4,5,6]][Math.min(Math.max(n,1),6)-1]; }
+function isSwimGoal(goal){ return /natation|nage|swim/.test((goal||'').toLowerCase()); }
 function objectiveSplit(goal,N){
   var g=(goal||'').toLowerCase();
-  var isCourse=['run','cours','10 km','10km','marathon','semi','trail','5 km','vite','hyrox'].some(function(w){return g.indexOf(w)>=0;});
+  var isCourse=['run','cours','10 km','10km','marathon','semi','trail','5 km','vite','hyrox','natation','nage'].some(function(w){return g.indexOf(w)>=0;});
   var isMuscu=['muscu','force','hypertroph','masse','explos'].some(function(w){return g.indexOf(w)>=0;});
   var course;
   if(isCourse&&!isMuscu) course=Math.max(1,Math.round(N*0.6));
@@ -1528,7 +1543,7 @@ function objectiveSplit(goal,N){
 }
 function goalCourseFrac(goal){
   var g=(goal||'').toLowerCase();
-  var isCourse=['run','cours','10 km','10km','marathon','semi','trail','5 km','vite','hyrox'].some(function(w){return g.indexOf(w)>=0;});
+  var isCourse=['run','cours','10 km','10km','marathon','semi','trail','5 km','vite','hyrox','natation','nage'].some(function(w){return g.indexOf(w)>=0;});
   var isMuscu=['muscu','force','hypertroph','masse','explos'].some(function(w){return g.indexOf(w)>=0;});
   if(isCourse&&!isMuscu) return 0.6;
   if(isMuscu&&!isCourse) return 0.25;
@@ -1547,8 +1562,12 @@ function unifiedCourseMain(t,w){
   if(t==='LONG') return (40+Math.min(w*3,30))+' min en allure tranquille (sortie longue).';
   return '30 min de footing.';
 }
+function unifiedSwimFocuses(c){ return [[],['endurance'],['endurance','vitesse'],['endurance','technique','vitesse'],['endurance','vitesse','endurance','technique'],['endurance','vitesse','technique','endurance','vitesse']][Math.min(Math.max(c,0),5)]; }
+function swimLevelFromProfile(){ var l=((S.profile&&S.profile.sport_level)||'').toLowerCase(); if(l.indexOf('debut')>=0||l.indexOf('débu')>=0) return 'debutant'; if(l.indexOf('avanc')>=0||l.indexOf('expert')>=0) return 'avance'; return 'inter'; }
+function swimSummary(focus,w){ var s=buildSwimSession(swimLevelFromProfile(), focus, 45, 25); var mains=s.main.map(function(x){return x.label;}).join(' · '); return swimFocusLabel(focus)+' — ~'+s.total+' m ('+mains+')'; }
 function buildUnifiedProgram(goal,offsets,weeks,equip,start,secondary){
   start=nextMonday(start);
+  var isSwim=isSwimGoal(goal);
   var N=offsets.length;
   var split=objectiveSplitBlend(goal,secondary,N);
   var slots=offsets.slice().sort(function(a,b){return a-b;});
@@ -1560,7 +1579,7 @@ function buildUnifiedProgram(goal,offsets,weeks,equip,start,secondary){
   var scheme=goalScheme(goal);
   var mSplit=split.muscu<=1?'fullbody':(split.muscu===2?'upperlower':'ppl');
   var pattern=muscuSplitDays(mSplit);
-  var cTypes=unifiedCourseTypes(split.course);
+  var cTypes=isSwim?unifiedSwimFocuses(split.course):unifiedCourseTypes(split.course);
   var mdays=[]; var counter=0; var runWeeks=[];
   for(var w=1;w<=weeks;w++){
     for(var s=0;s<muscuOffs.length;s++){
@@ -1571,17 +1590,20 @@ function buildUnifiedProgram(goal,offsets,weeks,equip,start,secondary){
       mdays.push({id:'w'+w+'m'+(s+1), week:w, grp:grp, label:muscuDayLabel(grp), date:addDays(start,(w-1)*7+muscuOffs[s]), deload:deload, done:false, exercises:exs});
     }
     var sess=[];
-    for(var q=0;q<courseOffs.length;q++){ var ct=cTypes[q%cTypes.length]||'EF'; sess.push({id:'w'+w+'c'+(q+1), t:ct, m:unifiedCourseMain(ct,w), date:addDays(start,(w-1)*7+courseOffs[q]), done:false}); }
+    for(var q=0;q<courseOffs.length;q++){ var dt=addDays(start,(w-1)*7+courseOffs[q]);
+      if(isSwim){ var sf=cTypes[q%cTypes.length]||'endurance'; sess.push({id:'w'+w+'c'+(q+1), t:'SWIM', swim:true, focus:sf, m:swimSummary(sf,w), date:dt, done:false}); }
+      else { var ct=cTypes[q%cTypes.length]||'EF'; sess.push({id:'w'+w+'c'+(q+1), t:ct, m:unifiedCourseMain(ct,w), date:dt, done:false}); }
+    }
     runWeeks.push({n:w, f:'Semaine '+w, sessions:sess});
   }
   var muscu = split.muscu>0 ? {split:mSplit, perWeek:split.muscu, weeks:weeks, equip:equip, start:start, scheme:scheme, days:mdays, unified:true} : null;
-  var run = split.course>0 ? {goal:'unifie', perWeek:split.course, start:start, weeks:runWeeks, unified:true} : null;
+  var run = split.course>0 ? {goal:'unifie', perWeek:split.course, start:start, weeks:runWeeks, unified:true, discipline:isSwim?'natation':'course'} : null;
   return {muscu:muscu, run:run, split:split};
 }
 function scrProgramOpts(){
   var p=S.profile||{};
   var tb='<div class="tbar"><button class="ic" onclick="go(\'dash\')"><i class="ti ti-chevron-left"></i></button><h2 style="font-size:19px">Programme complet</h2><span style="width:38px"></span></div>';
-  var goals=['Hyrox Solo','Hyrox Double','Football','Running','Courir plus vite','Trail','Marathon','Semi-marathon','Spartan Race','Cross Training','Musculation','Force','Hypertrophie','Explosivité','Perte de poids','Recomposition corporelle','Prise de masse','Prise de masse musculaire','Santé'].map(function(x){return [x,x];});
+  var goals=['Hyrox Solo','Hyrox Double','Football','Running','Courir plus vite','Trail','Marathon','Semi-marathon','Natation','Spartan Race','Cross Training','Musculation','Force','Hypertrophie','Explosivité','Perte de poids','Recomposition corporelle','Prise de masse','Prise de masse musculaire','Santé'].map(function(x){return [x,x];});
   var eq=[['Salle de sport complète','Salle de sport complète'],['Salle de sport (basique)','Salle de sport (basique)'],['Matériel maison (haltères/barre)','Matériel maison (haltères/barre)'],['Petit matériel (élastiques, kettlebell)','Petit matériel (élastiques, kettlebell)'],['Sans matériel (poids du corps)','Sans matériel (poids du corps)']];
   var dayNames=['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
   var dayRow=dayNames.map(function(dn,idx){ var def=(idx===0||idx===2||idx===4)?' checked':''; return '<label style="flex:1;text-align:center;font-size:11px;font-weight:700;color:var(--muted)"><input type="checkbox" class="up-day" value="'+idx+'"'+def+' style="display:block;margin:0 auto 4px;width:18px;height:18px;accent-color:var(--accent)">'+dn+'</label>'; }).join('');
@@ -1609,7 +1631,7 @@ async function doCreateUnified(){
     var r=await db.from('profiles').update(upd).eq('id',S.user.id);
     if(r.error) throw r.error;
     S.muscu=prog.muscu; S.runPlan=prog.run; if(S.profile){ S.profile.muscu_program=prog.muscu; S.profile.run_plan=prog.run; if(upd.main_goal)S.profile.main_goal=upd.main_goal; }
-    S.msg={k:'ok',t:'Programme complet créé ✅ '+prog.split.muscu+' muscu + '+prog.split.course+' course / semaine. Vois-le dans l\'Agenda.'};
+    S.msg={k:'ok',t:'Programme complet créé ✅ '+prog.split.muscu+' muscu + '+prog.split.course+(isSwimGoal(goal)?' natation':' course')+' / semaine. Vois-le dans l\'Agenda.'};
   }catch(e){ S.msg={k:'err',t:'Erreur : '+(e.message||e)}; }
   S.screen='dash'; render();
 }
@@ -2067,7 +2089,7 @@ function topAlert(){ var a=prCelebrationCard(); return a||inactivityCard(); }
 function upcomingCard(){
   var t=today(); var items=[];
   if(S.muscu&&S.muscu.days) S.muscu.days.forEach(function(d,di){ if(!d.done && d.date>=t) items.push({date:d.date, ic:'ti-barbell', col:'var(--accent)', label:'Muscu · '+((d.label||'').split('—')[0]||'').trim(), tap:'openMuscuDay('+di+')'}); });
-  if(S.runPlan&&S.runPlan.weeks) S.runPlan.weeks.forEach(function(w,wi){ w.sessions.forEach(function(s,si){ if(!s.done && s.date>=t) items.push({date:s.date, ic:'ti-run', col:'var(--green)', label:'Course · '+runTypeLabel(s.t), tap:'openRunSession('+wi+','+si+')'}); }); });
+  if(S.runPlan&&S.runPlan.weeks) S.runPlan.weeks.forEach(function(w,wi){ w.sessions.forEach(function(s,si){ if(!s.done && s.date>=t) items.push({date:s.date, ic:sessIcon(s), col:(s.swim?'var(--accent)':'var(--green)'), label:(s.swim?'Natation · '+swimFocusLabel(s.focus):'Course · '+runTypeLabel(s.t)), tap:'openRunSession('+wi+','+si+')'}); }); });
   (S.extSessions||[]).forEach(function(x){ if(x&&x.date>=t) items.push({date:x.date, ic:'ti-ball-football', col:'#F59E0B', label:(x.name||'Mon sport'), tap:''}); });
   if(!items.length) return '';
   items.sort(function(a,b){return a.date<b.date?-1:(a.date>b.date?1:0);});
@@ -2194,7 +2216,7 @@ function render(extra){
   else if(S.screen==='onboarding'){ html=scrOnboarding(); nav.style.display='none'; }
   else if(S.screen==='result'){ html=scrResult(extra); nav.style.display='flex'; nav.innerHTML=navBar(); }
   else { nav.style.display='flex'; nav.innerHTML=navBar();
-    html = S.screen==='checkin'?scrCheckin():(S.screen==='workout'?scrWorkout():(S.screen==='profile'?scrProfile():(S.screen==='genopts'?scrGenOptions():(S.screen==='charges'?scrCharges():(S.screen==='calendar'?scrCalendar():(S.screen==='coach'?scrCoach():(S.screen==='coachDetail'?scrCoachDetail():(S.screen==='nutrition'?scrNutrition():(S.screen==='runs'?scrRuns():(S.screen==='badges'?scrBadges():(S.screen==='feedback'?scrFeedback():(S.screen==='comps'?scrComps():(S.screen==='assistant'?scrAssistant():(S.screen==='report'?scrReport():(S.screen==='runplanopts'?scrRunPlanOpts():(S.screen==='runsession'?scrRunSession():(S.screen==='newathlete'?scrNewAthlete():(S.screen==='athleteEdit'?scrAthleteEdit():(S.screen==='muscu'?scrMuscu():(S.screen==='muscuopts'?scrMuscuOpts():(S.screen==='muscuday'?scrMuscuDay():(S.screen==='exodetail'?scrExoDetail():(S.screen==='leaderboard'?scrLeaderboard():(S.screen==='groupsession'?scrGroupSession():(S.screen==='programopts'?scrProgramOpts():(S.screen==='tests'?scrTests():(S.screen==='goals'?scrGoals():(S.screen==='goaledit'?scrGoalEdit():(S.screen==='records'?scrRecords():(S.screen==='teams'?scrTeams():(S.screen==='hiit'?scrHiit():(S.screen==='progress'?scrProgress():(S.screen==='injury'?scrInjury():(S.screen==='swim'?scrSwim():scrDash()))))))))))))))))))))))))))))))))));
+    html = S.screen==='checkin'?scrCheckin():(S.screen==='workout'?scrWorkout():(S.screen==='profile'?scrProfile():(S.screen==='genopts'?scrGenOptions():(S.screen==='charges'?scrCharges():(S.screen==='calendar'?scrCalendar():(S.screen==='coach'?scrCoach():(S.screen==='coachDetail'?scrCoachDetail():(S.screen==='nutrition'?scrNutrition():(S.screen==='runs'?scrRuns():(S.screen==='badges'?scrBadges():(S.screen==='feedback'?scrFeedback():(S.screen==='comps'?scrComps():(S.screen==='assistant'?scrAssistant():(S.screen==='report'?scrReport():(S.screen==='runplanopts'?scrRunPlanOpts():(S.screen==='runsession'?scrRunSession():(S.screen==='newathlete'?scrNewAthlete():(S.screen==='athleteEdit'?scrAthleteEdit():(S.screen==='muscu'?scrMuscu():(S.screen==='muscuopts'?scrMuscuOpts():(S.screen==='muscuday'?scrMuscuDay():(S.screen==='exodetail'?scrExoDetail():(S.screen==='leaderboard'?scrLeaderboard():(S.screen==='groupsession'?scrGroupSession():(S.screen==='programopts'?scrProgramOpts():(S.screen==='tests'?scrTests():(S.screen==='goals'?scrGoals():(S.screen==='goaledit'?scrGoalEdit():(S.screen==='records'?scrRecords():(S.screen==='teams'?scrTeams():(S.screen==='hiit'?scrHiit():(S.screen==='progress'?scrProgress():(S.screen==='injury'?scrInjury():scrDash())))))))))))))))))))))))))))))))));
   }
   sc.innerHTML=html; sc.scrollTop=0; S.msg=null;
   const e=document.getElementById('i-email'); if(e) e.addEventListener('keydown',ev=>{if(ev.key==='Enter')document.getElementById('i-pass').focus();});
