@@ -14,8 +14,8 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/3.24.0/tabler-icons.min.css"/>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
-  :root{--ink:#0B0B0F;--muted:#6B7280;--faint:#9AA1AC;--line:#ECEEF2;--accent:#2E6BFF;--accent-soft:#EAF0FF;--bg:#EEF1F5;--card:#FFFFFF;--green:#16A34A;--green-bg:#E8F6EC;--amber:#E08A2B;--amber-bg:#FBF1E3;--red:#E24B4A;--red-bg:#FBEAEA;}
-  html[data-theme="dark"]{--ink:#F5F6F8;--muted:#A2AAB5;--faint:#6B7280;--line:#262A31;--bg:#0E1014;--card:#171A20;--accent:#4D82FF;--accent-soft:#1A2542;--green-bg:#11241B;--amber-bg:#2A2110;--red-bg:#2A1416;}
+  :root{--ink:#0B0B0F;--muted:#6B7280;--faint:#9AA1AC;--line:#ECEEF2;--accent:#3B5BFF;--accent2:#6D28D9;--grad:linear-gradient(135deg,#3B5BFF 0%,#6D28D9 100%);--accent-soft:#ECEFFE;--bg:#F2F4F8;--card:#FFFFFF;--green:#16A34A;--green-bg:#E8F6EC;--amber:#E08A2B;--amber-bg:#FBF1E3;--red:#E24B4A;--red-bg:#FBEAEA;}
+  html[data-theme="dark"]{--ink:#F5F6F8;--muted:#A2AAB5;--faint:#6B7280;--line:#262A31;--bg:#0E1014;--card:#171A20;--accent:#5B7BFF;--accent2:#A78BFA;--grad:linear-gradient(135deg,#5B7BFF 0%,#8B5CF6 100%);--accent-soft:#1A2542;--green-bg:#11241B;--amber-bg:#2A2110;--red-bg:#2A1416;}
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Arial,sans-serif;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;min-height:100vh;display:flex;justify-content:center}
   #app{width:100%;max-width:460px;background:var(--card);height:100vh;display:flex;flex-direction:column;position:relative}
@@ -30,8 +30,8 @@
   .big{font-size:25px;font-weight:700;letter-spacing:-.02em} .sub{font-size:13px;color:var(--muted)}
   .pill{font-size:11px;font-weight:700;padding:4px 11px;border-radius:999px;display:inline-block}
   .pill.g{background:var(--green-bg);color:var(--green)} .pill.o{background:var(--amber-bg);color:var(--amber)} .pill.r{background:var(--red-bg);color:var(--red)}
-  .btn{display:flex;align-items:center;justify-content:center;gap:8px;background:var(--accent);color:#fff;font:inherit;font-size:15px;font-weight:700;border-radius:14px;padding:15px;width:100%;border:none;cursor:pointer;margin-top:4px}
-  .btn:active{transform:scale(.99)} .btn:disabled{opacity:.6} .btn.ghost{background:var(--accent-soft);color:var(--accent)} .btn.outline{background:#fff;border:1px solid var(--line);color:var(--ink)} .btn.dark{background:var(--ink)}
+  .btn{display:flex;align-items:center;justify-content:center;gap:8px;background:var(--grad);color:#fff;font:inherit;font-size:15px;font-weight:700;border-radius:14px;padding:15px;width:100%;border:none;cursor:pointer;margin-top:4px;box-shadow:0 8px 20px rgba(59,91,255,.24)}
+  .btn:active{transform:scale(.99)} .btn:disabled{opacity:.6} .btn.ghost{background:var(--accent-soft);color:var(--accent);box-shadow:none} .btn.outline{background:var(--card);border:1px solid var(--line);color:var(--ink);box-shadow:none} .btn.dark{background:var(--ink);box-shadow:none}
   .ring{width:100px;height:100px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-direction:column;flex:0 0 auto}
   .rng{width:100%;margin:11px 0 2px;accent-color:var(--accent)}
   .field{margin-bottom:13px} .field label{font-size:12px;font-weight:700;color:var(--muted);display:block;margin-bottom:6px}
@@ -226,17 +226,27 @@ function heroCard(){
   var ev=(calEvents()[today()]||[]).filter(function(e){return e.kind==='muscu'||e.kind==='run';});
   if(ev.length) return todayPlanCard();
   var wk=S.workout;
-  if(wk){ var done=wk.status==='realisee'; return '<div class="card" onclick="go(\'workout\')" style="cursor:pointer;background:var(--accent);border:none;padding:16px"><div style="color:#fff;opacity:.85;font-size:11px;font-weight:800;letter-spacing:.06em">SÉANCE DU JOUR</div><div style="color:#fff;font-weight:800;font-size:20px;margin:3px 0 2px">'+esc(wk.type||'Séance')+'</div><div style="color:#fff;opacity:.9;font-size:13px">'+esc(wk.objective||'')+(wk.estimated_duration?' · '+wk.estimated_duration+' min':'')+'</div><div style="margin-top:12px"><span style="display:inline-block;background:#fff;color:var(--accent);font-weight:800;padding:10px 18px;border-radius:12px">'+(done?'✓ Terminée — revoir':'Ouvrir la séance ›')+'</span></div></div>'; }
+  if(wk){ var done=wk.status==='realisee'; return '<div class="card" onclick="go(\'workout\')" style="cursor:pointer;background:var(--grad);border:none;padding:16px"><div style="color:#fff;opacity:.85;font-size:11px;font-weight:800;letter-spacing:.06em">SÉANCE DU JOUR</div><div style="color:#fff;font-weight:800;font-size:20px;margin:3px 0 2px">'+esc(wk.type||'Séance')+'</div><div style="color:#fff;opacity:.9;font-size:13px">'+esc(wk.objective||'')+(wk.estimated_duration?' · '+wk.estimated_duration+' min':'')+'</div><div style="margin-top:12px"><span style="display:inline-block;background:#fff;color:var(--accent);font-weight:800;padding:10px 18px;border-radius:12px">'+(done?'✓ Terminée — revoir':'Ouvrir la séance ›')+'</span></div></div>'; }
   return '<div class="card" style="padding:16px"><div class="label" style="margin-bottom:6px">Séance du jour</div><div class="sub" style="margin-bottom:12px">Aucune séance pour aujourd\'hui. L\'IA en crée une adaptée à ta forme et à ton objectif.</div><button class="btn" onclick="go(\'genopts\')"><i class="ti ti-sparkles"></i> Générer ma séance</button></div>';
 }
 function toggleTools(){ S.showTools=!S.showTools; render(); }
+function homeShortcuts(){
+  return '<div class="label" style="margin:16px 2px 8px">Accès rapide</div><div class="tiles">'+
+    tile('ti-salad','Nutrition','nutrition')+
+    tile('ti-trending-up','Ma progression','progress')+
+    tile('ti-target','Mes objectifs','goals')+
+    tile('ti-calendar-event','Agenda','calendar')+
+    '</div>';
+}
+function toolGroup(title,inner){ if(!inner) return ''; return '<div class="label" style="margin:16px 2px 8px">'+title+'</div><div class="tiles">'+inner+'</div>'; }
 function toolsBlock(){
   if(!S.showTools) return '';
-  var p=S.profile||{}; var w=S.weights||[]; var lastW=w.length?Number(w[w.length-1].weight).toFixed(1)+' kg':'—';
-  return goalsMiniCard()+
-    '<div class="card" style="display:flex;align-items:center;justify-content:space-between"><span class="label" style="margin:0">Poids actuel</span><span style="font-weight:700;color:var(--ink)">'+lastW+'</span></div>'+
-    '<div class="card" onclick="go(\'programopts\')" style="cursor:pointer;background:var(--accent);border:none"><div style="font-weight:700;font-size:15px;color:#fff"><i class="ti ti-wand"></i> Créer mon programme complet</div><div style="font-size:12px;color:#fff;opacity:.9;margin-top:3px">Muscu + course + objectif, sur un seul planning</div></div>'+
-    '<div class="label" style="margin:12px 2px 8px">Mes outils</div><div class="tiles">'+tile('ti-barbell','Programme muscu','muscu')+tile('ti-run','Sorties course','runs')+tile('ti-bolt','HIIT express','hiit')+tile('ti-salad','Nutrition','nutrition')+tile('ti-calendar-event','Agenda','calendar')+tile('ti-chart-line','Charges','charges')+tile('ti-robot','Assistant IA','assistant')+tile('ti-file-text','Rapport','report')+tile('ti-trophy','Compétitions','comps')+tile('ti-trending-up','Ma progression','progress')+tile('ti-clipboard-check','Mes tests','tests')+tile('ti-award','Records','records')+tile('ti-medal','Mes badges','badges')+(p.role==='admin'?tile('ti-crown','Classement','leaderboard'):'')+tile('ti-first-aid-kit','Je me suis blessé','injury')+tile('ti-message-circle','Avis','feedback')+'</div>';
+  var p=S.profile||{};
+  var train=tile('ti-wand','Programme complet','programopts')+tile('ti-barbell','Muscu','muscu')+tile('ti-run','Course','runs')+tile('ti-swimming','Natation','swim')+tile('ti-bolt','HIIT express','hiit');
+  var suivi=tile('ti-trending-up','Progression','progress')+tile('ti-chart-line','Charges','charges')+tile('ti-award','Records','records')+tile('ti-clipboard-check','Tests','tests')+tile('ti-target','Objectifs','goals')+tile('ti-trophy','Compétitions','comps');
+  var moti=tile('ti-medal','Badges','badges')+(p.role==='admin'?tile('ti-crown','Classement','leaderboard'):'');
+  var plus=tile('ti-robot','Assistant IA','assistant')+tile('ti-file-text','Rapport','report')+tile('ti-first-aid-kit','Je me suis blessé','injury')+tile('ti-message-circle','Avis','feedback');
+  return toolGroup('M\'entraîner',train)+toolGroup('Ma nutrition',tile('ti-salad','Nutrition','nutrition'))+toolGroup('Mon suivi',suivi)+toolGroup('Motivation',moti)+toolGroup('Plus',plus);
 }
 function scrDash(){
   const sc = S.todayScore; const hasScore = !!sc; const lvl = hasScore ? sc.level : null;
@@ -257,7 +267,7 @@ function scrDash(){
   }
   const w = S.weights; const lastW = w.length ? Number(w[w.length-1].weight).toFixed(1)+' kg' : '—';
   return '<div class="tbar"><div><div class="t">'+new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'})+'</div><h2>Bonjour, '+esc(displayName())+'</h2></div><button class="ic" onclick="go(\'profile\')" title="Mon profil"><i class="ti ti-user"></i></button></div>'+
-    (S.offline?'<div class="banner" style="background:var(--amber-bg)"><i class="ti ti-wifi-off" style="color:var(--amber)"></i><div class="x" style="color:#7a4a12">Mode hors-ligne — voici les données de ta dernière connexion. Reconnecte-toi pour synchroniser.</div></div>':'')+topAlert()+restAdviceCard()+coachNoteCard()+streakCard()+coachEntryCard()+checkinBlock()+heroCard()+upcomingCard()+'<button class="btn outline" onclick="toggleTools()" style="margin-top:2px"><i class="ti '+(S.showTools?'ti-chevron-up':'ti-layout-grid')+'"></i> '+(S.showTools?'Masquer les outils':'Tous mes outils')+'</button>'+toolsBlock();
+    (S.offline?'<div class="banner" style="background:var(--amber-bg)"><i class="ti ti-wifi-off" style="color:var(--amber)"></i><div class="x" style="color:#7a4a12">Mode hors-ligne — voici les données de ta dernière connexion. Reconnecte-toi pour synchroniser.</div></div>':'')+(restAdviceCard()||topAlert())+coachNoteCard()+checkinBlock()+heroCard()+homeShortcuts()+streakCard()+upcomingCard()+coachEntryCard()+'<button class="btn outline" onclick="toggleTools()" style="margin-top:14px"><i class="ti '+(S.showTools?'ti-chevron-up':'ti-layout-grid')+'"></i> '+(S.showTools?'Masquer les outils':'Tous mes outils')+'</button>'+toolsBlock();
 }
 function scrWorkout(){
   if(S.generating){ return '<div class="tbar"><button class="ic" onclick="go(\'dash\')"><i class="ti ti-chevron-left"></i></button><h2 style="font-size:19px">Séance du jour</h2><span style="width:38px"></span></div><div class="center" style="min-height:380px"><div class="spin" style="border-color:var(--accent);border-top-color:transparent;width:30px;height:30px"></div><div>L\'IA génère ta séance…</div><div class="sub">Quelques secondes</div></div>'; }
@@ -1850,6 +1860,56 @@ function hiitLevel(){ return Math.floor(hiitDone()/3); }
 function hiitParams(){ var lv=hiitLevel(); var bonus=Math.min(lv*5,20); var rounds=Math.min(4+lv,8); var rest=Math.max(10,20-lv*2); var exos=HIIT_BASE.map(function(e){ return [e[0], e[1]+bonus]; }); return {level:lv, rounds:rounds, rest:rest, exos:exos}; }
 function startHiitCircuit(){ var p=hiitParams(); var steps=[]; for(var r=1;r<=p.rounds;r++){ p.exos.forEach(function(e,i){ steps.push({label:e[0],sec:e[1],kind:'work',round:r}); var last=(r===p.rounds && i===p.exos.length-1); if(!last) steps.push({label:'Repos',sec:p.rest,kind:'rest',round:r}); }); } startCircuit(steps); }
 function validateHiit(){ var d=hiitDone()+1; try{ localStorage.setItem('athlon_hiit_done',String(d)); }catch(_){} if(S.profile)S.profile.hiit_done=d; try{ if(S.user) db.from('profiles').update({hiit_done:d}).eq('id',S.user.id); }catch(_){} var lv=Math.floor(d/3); if(d%3===0){ S.msg={k:'ok',t:'HIIT validé ! Niveau '+lv+' 🔥 — plus de tours.'}; } else { S.msg={k:'ok',t:'HIIT validé ! Encore '+(3-(d%3))+' pour le niveau suivant.'}; } render(); }
+/* ===== NATATION — séances à la demande ===== */
+function swimFocusLabel(f){ return {endurance:'Endurance',technique:'Technique',vitesse:'Vitesse / sprint',recup:'Récupération'}[f]||'Séance'; }
+function swimLevelLabel(l){ return {debutant:'Débutant',inter:'Intermédiaire',avance:'Avancé'}[l]||'Intermédiaire'; }
+function buildSwimSession(level, focus, dur, pool){
+  pool=parseInt(pool)||25; dur=parseInt(dur)||45; level=level||'inter'; focus=focus||'endurance';
+  var lf=level==='debutant'?0.6:(level==='avance'?1.3:1);
+  var df=dur/45; var f=lf*df;
+  var reps=function(base){ return Math.max(1, Math.round(base*f)); };
+  var dist=function(base){ var d=Math.round(base*f/pool)*pool; return Math.max(pool, d); };
+  var mk=function(label, detail, rest, meters){ return {label:label, detail:detail, rest:rest||'', meters:meters}; };
+  var set=function(n, unit, detail, rest){ n=reps(n); return mk(n+' × '+unit+' m', detail, rest, n*unit); };
+  var cont=function(base, detail){ var m=dist(base); return mk(m+' m', detail, '', m); };
+  var warm=[ cont(200,'Nage libre souple, respiration régulière'), set(4,50,'Éducatifs : 25 m éducatif (rattrapé, pointe de flèche) + 25 m nage','r 15 s') ];
+  var main=[], note='';
+  if(focus==='endurance'){
+    main=[ set(6,100,'Nage libre, allure régulière soutenue','r 20 s'), set(2,200,'Négatif split : 2e moitié plus rapide','r 30 s') ];
+    note='Tiens une allure régulière que tu peux maintenir. Objectif : volume et souffle.';
+  } else if(focus==='technique'){
+    main=[ set(8,50,'Éducatifs variés : godille, un bras, rattrapé','r 15 s'), set(4,50,'Pull-buoy : gainage + traction des bras','r 20 s'), set(4,50,'Planche : battements de jambes (palmes si dispo)','r 20 s') ];
+    note='Concentre-toi sur la position du corps et la glisse, pas sur la vitesse.';
+  } else if(focus==='vitesse'){
+    main=[ set(8,25,'Sprint départ coulée, effort maximal','r 45 s'), set(6,50,'Rapide mais technique propre','r 40 s') ];
+    note='Récupération longue entre les efforts pour sprinter à fond à chaque fois.';
+  } else {
+    main=[ cont(400,'Nage continue très souple (crawl / dos en alternance)'), set(4,50,'Dos crawlé, épaules relâchées','r 15 s') ];
+    note='Séance douce : décrasser, respirer, relâcher les épaules.';
+  }
+  var cool=[ cont(100,'Retour au calme, respiration profonde') ];
+  var total=0; [warm,main,cool].forEach(function(b){ b.forEach(function(x){ total+=x.meters; }); });
+  return {level:level, focus:focus, dur:dur, pool:pool, warm:warm, main:main, cool:cool, note:note, total:total};
+}
+function setSwim(k,v){ S.swim=S.swim||{level:'inter',focus:'endurance',dur:45,pool:25}; S.swim[k]=v; render(); }
+function swimDone(){ try{ return parseInt(localStorage.getItem('athlon_swim_done')||'0')||0; }catch(_){ return 0; } }
+function validateSwim(){ try{ var n=swimDone()+1; localStorage.setItem('athlon_swim_done', String(n)); S.msg={k:'ok',t:'Séance natation validée ! '+n+' au total. 🏊'}; }catch(_){ S.msg={k:'ok',t:'Séance natation validée ! 🏊'}; } render(); }
+function scrSwim(){
+  var s=S.swim||{level:'inter',focus:'endurance',dur:45,pool:25};
+  var tb='<div class="tbar"><button class="ic" onclick="go(\'dash\')"><i class="ti ti-chevron-left"></i></button><h2 style="font-size:19px">Natation</h2><span style="width:38px"></span></div>';
+  var msg=S.msg?'<div class="msg '+S.msg.k+'">'+S.msg.t+'</div>':'';
+  var seg=function(k,opts){ return '<div class="seg" style="margin:0">'+opts.map(function(o){ return '<button class="'+(String(s[k])===String(o[0])?'on':'')+'" onclick="setSwim(\''+k+'\',\''+o[0]+'\')">'+o[1]+'</button>'; }).join('')+'</div>'; };
+  var opts='<div class="card"><div class="flabel">Objectif de la séance</div>'+seg('focus',[['endurance','Endurance'],['technique','Technique'],['vitesse','Vitesse'],['recup','Récup']])+
+    '<div class="flabel" style="margin-top:12px">Niveau</div>'+seg('level',[['debutant','Débutant'],['inter','Inter'],['avance','Avancé']])+
+    '<div class="flabel" style="margin-top:12px">Durée</div>'+seg('dur',[['30','30 min'],['45','45 min'],['60','60 min']])+
+    '<div class="flabel" style="margin-top:12px">Longueur du bassin</div>'+seg('pool',[['25','25 m'],['50','50 m']])+'</div>';
+  var sess=buildSwimSession(s.level,s.focus,s.dur,s.pool);
+  var block=function(titre, ic, arr){ var rows=arr.map(function(x){ return '<div class="ex"><div class="n"><i class="ti '+ic+'"></i></div><div class="m"><div class="nm">'+esc(x.label)+(x.rest?' <span class="sub" style="font-weight:600">· '+esc(x.rest)+'</span>':'')+'</div><div class="ds">'+esc(x.detail)+'</div></div></div>'; }).join(''); return '<div class="label" style="margin:14px 2px 6px">'+titre+'</div><div class="card" style="padding:6px 14px">'+rows+'</div>'; };
+  var head='<div class="banner" style="background:var(--accent-soft)"><i class="ti ti-swimming" style="color:var(--accent)"></i><div class="x" style="color:#1742a5"><b>'+swimFocusLabel(s.focus)+' · '+swimLevelLabel(s.level)+'</b><br><span style="color:var(--ink)">Bassin '+s.pool+' m · ~'+sess.total+' m au total · '+swimDone()+' séance(s) nagée(s)</span></div></div>';
+  var noteHtml='<div class="banner" style="background:var(--amber-bg)"><i class="ti ti-bulb" style="color:var(--amber)"></i><div class="x" style="color:#7a4a12">'+esc(sess.note)+'</div></div>';
+  var rest='<button class="btn outline" onclick="startRest(20)" style="margin-bottom:10px"><i class="ti ti-stopwatch"></i> Chrono de repos (20 s)</button>';
+  return tb+msg+opts+head+block('Échauffement','ti-flame',sess.warm)+block('Corps de séance','ti-swimming',sess.main)+block('Retour au calme','ti-stretching',sess.cool)+noteHtml+rest+'<button class="btn" onclick="validateSwim()"><i class="ti ti-check"></i> Valider ma séance natation</button>';
+}
 function scrHiit(){
   var p=hiitParams(); var done=hiitDone();
   var tb='<div class="tbar"><button class="ic" onclick="go(\'dash\')"><i class="ti ti-chevron-left"></i></button><h2 style="font-size:19px">HIIT express</h2><span style="width:38px"></span></div>';
@@ -1959,7 +2019,7 @@ function todayPlanCard(){
     var right=e.done?'<span style="background:rgba(255,255,255,.25);color:#fff;font-size:11px;font-weight:700;padding:2px 9px;border-radius:20px">Fait ✓</span>':'<i class="ti ti-chevron-right" style="color:#fff;opacity:.9;font-size:20px"></i>';
     return '<div onclick="'+onclick+'" style="cursor:pointer;display:flex;align-items:center;gap:11px;padding:10px 0;border-top:1px solid rgba(255,255,255,.22)"><i class="ti '+icon+'" style="color:#fff;font-size:19px"></i><div style="flex:1;min-width:0"><div style="color:#fff;font-weight:700;font-size:15px">'+esc(e.label)+'</div><div style="color:#fff;opacity:.85;font-size:12px">'+sub+'</div></div>'+right+'</div>';
   }).join('');
-  return '<div class="card" style="background:var(--accent);border:none;padding:14px 15px"><div style="color:#fff;font-weight:800;font-size:15px"><i class="ti ti-calendar-star" style="vertical-align:-2px"></i> Au programme aujourd\'hui</div><div style="color:#fff;opacity:.85;font-size:12px;margin-top:2px">Ta séance planifiée — touche pour l\'ouvrir.</div>'+rows+'</div>';
+  return '<div class="card" style="background:var(--grad);border:none;padding:14px 15px"><div style="color:#fff;font-weight:800;font-size:15px"><i class="ti ti-calendar-star" style="vertical-align:-2px"></i> Au programme aujourd\'hui</div><div style="color:#fff;opacity:.85;font-size:12px;margin-top:2px">Ta séance planifiée — touche pour l\'ouvrir.</div>'+rows+'</div>';
 }
 function prList(){
   var lifts=S.lifts||[]; var best={};
@@ -2134,7 +2194,7 @@ function render(extra){
   else if(S.screen==='onboarding'){ html=scrOnboarding(); nav.style.display='none'; }
   else if(S.screen==='result'){ html=scrResult(extra); nav.style.display='flex'; nav.innerHTML=navBar(); }
   else { nav.style.display='flex'; nav.innerHTML=navBar();
-    html = S.screen==='checkin'?scrCheckin():(S.screen==='workout'?scrWorkout():(S.screen==='profile'?scrProfile():(S.screen==='genopts'?scrGenOptions():(S.screen==='charges'?scrCharges():(S.screen==='calendar'?scrCalendar():(S.screen==='coach'?scrCoach():(S.screen==='coachDetail'?scrCoachDetail():(S.screen==='nutrition'?scrNutrition():(S.screen==='runs'?scrRuns():(S.screen==='badges'?scrBadges():(S.screen==='feedback'?scrFeedback():(S.screen==='comps'?scrComps():(S.screen==='assistant'?scrAssistant():(S.screen==='report'?scrReport():(S.screen==='runplanopts'?scrRunPlanOpts():(S.screen==='runsession'?scrRunSession():(S.screen==='newathlete'?scrNewAthlete():(S.screen==='athleteEdit'?scrAthleteEdit():(S.screen==='muscu'?scrMuscu():(S.screen==='muscuopts'?scrMuscuOpts():(S.screen==='muscuday'?scrMuscuDay():(S.screen==='exodetail'?scrExoDetail():(S.screen==='leaderboard'?scrLeaderboard():(S.screen==='groupsession'?scrGroupSession():(S.screen==='programopts'?scrProgramOpts():(S.screen==='tests'?scrTests():(S.screen==='goals'?scrGoals():(S.screen==='goaledit'?scrGoalEdit():(S.screen==='records'?scrRecords():(S.screen==='teams'?scrTeams():(S.screen==='hiit'?scrHiit():(S.screen==='progress'?scrProgress():(S.screen==='injury'?scrInjury():scrDash())))))))))))))))))))))))))))))))));
+    html = S.screen==='checkin'?scrCheckin():(S.screen==='workout'?scrWorkout():(S.screen==='profile'?scrProfile():(S.screen==='genopts'?scrGenOptions():(S.screen==='charges'?scrCharges():(S.screen==='calendar'?scrCalendar():(S.screen==='coach'?scrCoach():(S.screen==='coachDetail'?scrCoachDetail():(S.screen==='nutrition'?scrNutrition():(S.screen==='runs'?scrRuns():(S.screen==='badges'?scrBadges():(S.screen==='feedback'?scrFeedback():(S.screen==='comps'?scrComps():(S.screen==='assistant'?scrAssistant():(S.screen==='report'?scrReport():(S.screen==='runplanopts'?scrRunPlanOpts():(S.screen==='runsession'?scrRunSession():(S.screen==='newathlete'?scrNewAthlete():(S.screen==='athleteEdit'?scrAthleteEdit():(S.screen==='muscu'?scrMuscu():(S.screen==='muscuopts'?scrMuscuOpts():(S.screen==='muscuday'?scrMuscuDay():(S.screen==='exodetail'?scrExoDetail():(S.screen==='leaderboard'?scrLeaderboard():(S.screen==='groupsession'?scrGroupSession():(S.screen==='programopts'?scrProgramOpts():(S.screen==='tests'?scrTests():(S.screen==='goals'?scrGoals():(S.screen==='goaledit'?scrGoalEdit():(S.screen==='records'?scrRecords():(S.screen==='teams'?scrTeams():(S.screen==='hiit'?scrHiit():(S.screen==='progress'?scrProgress():(S.screen==='injury'?scrInjury():(S.screen==='swim'?scrSwim():scrDash()))))))))))))))))))))))))))))))))));
   }
   sc.innerHTML=html; sc.scrollTop=0; S.msg=null;
   const e=document.getElementById('i-email'); if(e) e.addEventListener('keydown',ev=>{if(ev.key==='Enter')document.getElementById('i-pass').focus();});
