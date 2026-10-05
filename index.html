@@ -1607,16 +1607,23 @@ function unifiedCourseMain(t,w){
 function unifiedSwimFocuses(c){ return [[],['endurance'],['endurance','vitesse'],['endurance','technique','vitesse'],['endurance','vitesse','endurance','technique'],['endurance','vitesse','technique','endurance','vitesse']][Math.min(Math.max(c,0),5)]; }
 function swimLevelFromProfile(){ var l=((S.profile&&S.profile.sport_level)||'').toLowerCase(); if(l.indexOf('debut')>=0||l.indexOf('débu')>=0) return 'debutant'; if(l.indexOf('avanc')>=0||l.indexOf('expert')>=0) return 'avance'; return 'inter'; }
 function swimSummary(focus,w){ var s=buildSwimSession(swimLevelFromProfile(), focus, 45, 25); var mains=s.main.map(function(x){return x.label;}).join(' · '); return swimFocusLabel(focus)+' — ~'+s.total+' m ('+mains+')'; }
-function buildUnifiedProgram(goal,offsets,weeks,equip,start,secondary){
+function buildUnifiedProgram(goal,offsets,weeks,equip,start,secondary,manual){
   start=nextMonday(start);
   var isSwim=isSwimGoal(goal);
-  var N=offsets.length;
-  var split=objectiveSplitBlend(goal,secondary,N);
-  var slots=offsets.slice().sort(function(a,b){return a-b;});
-  var types=[]; var m=split.muscu, c=split.course;
-  for(var i=0;i<N;i++){ if(i%2===0){ if(c>0){types.push('course');c--;} else {types.push('muscu');m--;} } else { if(m>0){types.push('muscu');m--;} else {types.push('course');c--;} } }
-  var muscuOffs=[], courseOffs=[];
-  for(var k=0;k<N;k++){ if(types[k]==='muscu') muscuOffs.push(slots[k]); else courseOffs.push(slots[k]); }
+  var muscuOffs, courseOffs, split;
+  if(manual && ((manual.courseOffs&&manual.courseOffs.length)||(manual.muscuOffs&&manual.muscuOffs.length))){
+    courseOffs=(manual.courseOffs||[]).slice().sort(function(a,b){return a-b;});
+    muscuOffs=(manual.muscuOffs||[]).slice().sort(function(a,b){return a-b;});
+    split={course:courseOffs.length, muscu:muscuOffs.length};
+  } else {
+    var N=offsets.length;
+    split=objectiveSplitBlend(goal,secondary,N);
+    var slots=offsets.slice().sort(function(a,b){return a-b;});
+    var types=[]; var m=split.muscu, c=split.course;
+    for(var i=0;i<N;i++){ if(i%2===0){ if(c>0){types.push('course');c--;} else {types.push('muscu');m--;} } else { if(m>0){types.push('muscu');m--;} else {types.push('course');c--;} } }
+    muscuOffs=[]; courseOffs=[];
+    for(var k=0;k<N;k++){ if(types[k]==='muscu') muscuOffs.push(slots[k]); else courseOffs.push(slots[k]); }
+  }
   var tier=muscuEquipTier(equip);
   var scheme=goalScheme(goal);
   var mSplit=split.muscu<=1?'fullbody':(split.muscu===2?'upperlower':'ppl');
@@ -1642,17 +1649,21 @@ function buildUnifiedProgram(goal,offsets,weeks,equip,start,secondary){
   var run = split.course>0 ? {goal:'unifie', perWeek:split.course, start:start, weeks:runWeeks, unified:true, discipline:isSwim?'natation':'course'} : null;
   return {muscu:muscu, run:run, split:split};
 }
+function setUpDay(i,v){ S.upDays=S.upDays||{}; S.upDays[i]=v; render(); }
 function scrProgramOpts(){
   var p=S.profile||{};
   var tb='<div class="tbar"><button class="ic" onclick="go(\'dash\')"><i class="ti ti-chevron-left"></i></button><h2 style="font-size:19px">Programme complet</h2><span style="width:38px"></span></div>';
   var goals=['Hyrox Solo','Hyrox Double','Football','Running','Courir plus vite','Trail','Marathon','Semi-marathon','Natation','Spartan Race','Cross Training','Musculation','Force','Hypertrophie','Explosivité','Perte de poids','Recomposition corporelle','Prise de masse','Prise de masse musculaire','Santé'].map(function(x){return [x,x];});
   var eq=[['Salle de sport complète','Salle de sport complète'],['Salle de sport (basique)','Salle de sport (basique)'],['Matériel maison (haltères/barre)','Matériel maison (haltères/barre)'],['Petit matériel (élastiques, kettlebell)','Petit matériel (élastiques, kettlebell)'],['Sans matériel (poids du corps)','Sans matériel (poids du corps)']];
-  var dayNames=['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
-  var dayRow=dayNames.map(function(dn,idx){ var def=(idx===0||idx===2||idx===4)?' checked':''; return '<label style="flex:1;text-align:center;font-size:11px;font-weight:700;color:var(--muted)"><input type="checkbox" class="up-day" value="'+idx+'"'+def+' style="display:block;margin:0 auto 4px;width:18px;height:18px;accent-color:var(--accent)">'+dn+'</label>'; }).join('');
-  return tb+'<div class="banner" style="background:var(--accent-soft)"><i class="ti ti-wand" style="color:var(--accent)"></i><div class="x" style="color:#1742a5">Un seul programme qui combine <b>muscu + course</b> selon ton objectif et les jours où tu t\'entraînes. L\'app répartit tout sur ton planning. Tu pourras toujours générer une <b>séance bonus</b> (onglet Séance) un jour libre.</div></div>'+
+  var dayNames=['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi','Dimanche'];
+  if(!S.upDays){ S.upDays={0:'course',2:'course',4:'renfo'}; }
+  var dayRow=dayNames.map(function(dn,idx){ var v=(S.upDays||{})[idx]||'repos';
+    return '<div class="row" style="align-items:center;gap:8px;margin-top:7px"><span style="width:66px;font-size:12px;font-weight:700;color:var(--ink)">'+dn+'</span><div class="seg" style="margin:0;flex:1"><button class="'+(v==='repos'?'on':'')+'" onclick="setUpDay('+idx+',\'repos\')">Repos</button><button class="'+(v==='course'?'on':'')+'" onclick="setUpDay('+idx+',\'course\')">Course</button><button class="'+(v==='renfo'?'on':'')+'" onclick="setUpDay('+idx+',\'renfo\')">Renfo</button></div></div>'; }).join('');
+  var cCount=0,mCount=0; for(var di=0;di<7;di++){ var dv=(S.upDays||{})[di]; if(dv==='course')cCount++; else if(dv==='renfo')mCount++; }
+  return tb+'<div class="banner" style="background:var(--accent-soft)"><i class="ti ti-wand" style="color:var(--accent)"></i><div class="x" style="color:#1742a5">Choisis ton objectif, puis <b>pour chaque jour</b> : Course, Renfo (muscu/poids du corps) ou Repos. L\'app construit le planning exactement comme tu le décides.</div></div>'+
     selField('up-goal','Objectif principal',p.main_goal,goals)+
     selField('up-goal2','Objectif secondaire (optionnel)',null,goals)+
-    '<div class="card"><div class="flabel">Mes jours d\'entraînement (coche tes jours)</div><div class="row" style="gap:4px;margin-top:9px">'+dayRow+'</div></div>'+
+    '<div class="card"><div class="flabel">Mon planning — choisis chaque jour</div>'+dayRow+'<div class="sub" style="margin-top:10px;text-align:center;font-weight:700;color:var(--accent)">'+cCount+' jour(s) course · '+mCount+' jour(s) renfo</div></div>'+
     '<div class="card"><div class="flabel">Durée du programme</div><select class="in" id="up-weeks"><option value="4">4 semaines</option><option value="6" selected>6 semaines</option><option value="8">8 semaines</option></select></div>'+
     selField('up-equip','Matériel disponible',p.available_equipment,eq)+
     '<div class="card"><div class="flabel">Date de début (démarre le lundi suivant)</div><input id="up-start" class="in" type="date" value="'+today()+'"></div>'+
@@ -1661,12 +1672,13 @@ function scrProgramOpts(){
 async function doCreateUnified(){
   var goalEl=document.getElementById('up-goal'); var goal=(goalEl&&goalEl.value)||(S.profile&&S.profile.main_goal)||'Forme';
   var g2El=document.getElementById('up-goal2'); var secondary=(g2El&&g2El.value)||'';
-  var dayEls=document.querySelectorAll('.up-day'); var offs=[]; for(var i=0;i<dayEls.length;i++){ if(dayEls[i].checked) offs.push(parseInt(dayEls[i].value)); }
-  if(!offs.length){ S.msg={k:'err',t:'Choisis au moins un jour d\'entraînement.'}; render(); return; }
+  var courseOffs=[], muscuOffs=[]; for(var i=0;i<7;i++){ var dv=(S.upDays||{})[i]; if(dv==='course')courseOffs.push(i); else if(dv==='renfo')muscuOffs.push(i); }
+  var offs=courseOffs.concat(muscuOffs);
+  if(!offs.length){ S.msg={k:'err',t:'Choisis au moins un jour (Course ou Renfo).'}; render(); return; }
   var weeks=parseInt(document.getElementById('up-weeks').value)||6;
   var eqEl=document.getElementById('up-equip'); var equip=(eqEl&&eqEl.value)||(S.profile&&S.profile.available_equipment)||'Salle de sport (basique)';
   var start=document.getElementById('up-start').value||today();
-  var prog=buildUnifiedProgram(goal,offs,weeks,equip,start,secondary);
+  var prog=buildUnifiedProgram(goal,offs,weeks,equip,start,secondary,{courseOffs:courseOffs, muscuOffs:muscuOffs});
   try{
     var upd={ muscu_program:prog.muscu, run_plan:prog.run };
     if(goalEl&&goalEl.value){ upd.main_goal=goalEl.value; }
