@@ -1444,7 +1444,7 @@ function scrMuscuDay(){
   var isToday=(d.date===today());
   var lighten=(isToday&&!d.done&&!d.lightened&&restAdviceCard())?'<button class="btn outline" onclick="doLightenMuscuDay()" style="margin-bottom:12px"><i class="ti ti-battery-2"></i> Pas la forme ? Alléger cette séance</button>':'';
   var lightBadge=d.lightened?'<div class="banner" style="background:var(--green-bg)"><i class="ti ti-battery-2" style="color:var(--green)"></i><div class="x" style="color:var(--green)">Séance allégée pour ménager ta récupération.</div></div>':'';
-  return tb+msg+head+extC+hint+(isToday?restAdviceCard():'')+lightBadge+lighten+'<button class="btn outline" onclick="startStopwatch()" style="margin-bottom:12px"><i class="ti ti-stopwatch"></i> Chrono de séance</button>'+'<div class="card" style="padding:6px 14px">'+list+'</div><button class="btn outline" onclick="doSaveMuscuLoads()" style="margin-bottom:9px"><i class="ti ti-device-floppy"></i> Enregistrer mes charges</button>'+goalFinisherBlock(d)+coreBlock()+finisherBlock()+regen+rpeBlock('muscu')+btnDone;
+  return tb+msg+head+extC+hint+dayEquipBlock(d)+(isToday?restAdviceCard():'')+lightBadge+lighten+'<button class="btn outline" onclick="startStopwatch()" style="margin-bottom:12px"><i class="ti ti-stopwatch"></i> Chrono de séance</button>'+'<div class="card" style="padding:6px 14px">'+list+'</div><button class="btn outline" onclick="doSaveMuscuLoads()" style="margin-bottom:9px"><i class="ti ti-device-floppy"></i> Enregistrer mes charges</button>'+goalFinisherBlock(d)+coreBlock()+finisherBlock()+rpeBlock('muscu')+btnDone;
 }
 async function doSaveMuscuLoads(){
   var idx=S.selMuscuDay; if(idx==null||!S.muscu) return; var d=S.muscu.days[idx];
@@ -1489,6 +1489,30 @@ async function doRegenMuscuDay(){
   d.equip=equip;
   try{ await db.from('profiles').update({muscu_program:S.muscu}).eq('id',S.user.id); if(S.profile)S.profile.muscu_program=S.muscu; S.msg={k:'ok',t:'Séance régénérée pour : '+equip}; }catch(e){ S.msg={k:'err',t:'Erreur : '+(e.message||e)}; }
   render();
+}
+async function doSetDayEquip(equip){
+  var idx=S.selMuscuDay; if(idx==null||!S.muscu||!S.muscu.days[idx]) return; var d=S.muscu.days[idx];
+  if(muscuEquipTier(equip)===muscuEquipTier(d.equip||S.muscu.equip)){ return; }
+  var grp=d.grp||grpFromLabel(d.label); var tier=muscuEquipTier(equip);
+  var lib=muscuExo(grp,tier);
+  var scheme=(S.muscu&&S.muscu.scheme)||goalScheme((S.profile&&S.profile.main_goal)||'');
+  d.exercises=progExercises(lib,d.week||1,(S.muscu&&S.muscu.weeks)||1,scheme);
+  d.equip=equip; d.lightened=false;
+  try{ await db.from('profiles').update({muscu_program:S.muscu}).eq('id',S.user.id); if(S.profile)S.profile.muscu_program=S.muscu; S.msg={k:'ok',t:'Séance adaptée à ton matériel du jour : '+equip}; }catch(e){ S.msg={k:'err',t:'Erreur : '+(e.message||e)}; }
+  render();
+}
+function dayEquipBlock(d){
+  if(!d) return '';
+  var cur=d.equip||(S.muscu&&S.muscu.equip)||'Salle de sport (basique)';
+  var def=(S.muscu&&S.muscu.equip)||'';
+  var opts=[['Salle de sport complète','Salle','ti-barbell'],['Matériel maison (haltères/barre)','Maison','ti-home'],['Petit matériel (élastiques, kettlebell)','Élastiques','ti-activity'],['Sans matériel (poids du corps)','Poids du corps','ti-stretching']];
+  var chips=opts.map(function(o){
+    var on=(muscuEquipTier(cur)===muscuEquipTier(o[0]));
+    return '<button onclick="doSetDayEquip(\''+o[0].replace(/'/g,"\\'")+'\')" style="flex:1 1 86px;min-width:86px;border:1px solid '+(on?'var(--accent)':'var(--line)')+';background:'+(on?'var(--accent-soft)':'var(--bg)')+';color:'+(on?'#1742a5':'var(--ink)')+';border-radius:11px;padding:10px 6px;font:inherit;font-size:12px;font-weight:700;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px"><i class="ti '+o[2]+'" style="font-size:17px"></i>'+o[1]+'</button>';
+  }).join('');
+  var changed=def&&(muscuEquipTier(cur)!==muscuEquipTier(def));
+  var back=changed?'<div style="margin-top:8px"><span onclick="doSetDayEquip(\''+String(def).replace(/'/g,"\\'")+'\')" style="color:var(--accent);font-weight:700;font-size:11px;cursor:pointer"><i class="ti ti-arrow-back-up" style="vertical-align:-2px"></i> Revenir au matériel du programme ('+esc(def)+')</span></div>':'';
+  return '<div class="card"><div class="label" style="margin-bottom:5px"><i class="ti ti-tools" style="vertical-align:-2px;color:var(--accent)"></i> Matériel du jour</div><div class="sub" style="margin:0 0 10px;font-size:12px">Pas au même endroit aujourd\'hui ? Choisis ce que tu as sous la main — la séance s\'adapte aussitôt (mêmes muscles, mêmes objectifs).</div><div style="display:flex;gap:7px;flex-wrap:wrap">'+chips+'</div>'+back+'</div>';
 }
 function exoInfo(name){
   var n=(name||'').toLowerCase();
