@@ -1598,16 +1598,17 @@ function objectiveSplitBlend(primary,secondary,N){
   return {course:course, muscu:N-course};
 }
 function unifiedCourseTypes(c){ return [[],['EF'],['EF','FRAC'],['EF','FRAC','LONG'],['EF','FRAC','EF','LONG'],['EF','FRAC','EF','LONG','EF']][Math.min(Math.max(c,0),5)]; }
-function unifiedCourseMain(t,w){
-  if(t==='EF') return (25+Math.min(w*2,20))+' min de footing lent (endurance fondamentale : tu dois pouvoir parler).';
-  if(t==='FRAC') return '10 min footing, puis '+(6+Math.min(w,6))+' × (1 min vite / 1 min 30 lent), puis 8 min footing.';
-  if(t==='LONG') return (40+Math.min(w*3,30))+' min en allure tranquille (sortie longue).';
+function paceAt(vma,pct){ return fmtPace(60/(vma*pct/100)); }
+function unifiedCourseMain(t,w,vma){
+  if(t==='EF'){ var d=(25+Math.min(w*2,20)); return vma?(d+' min en endurance fondamentale, allure ~'+paceAt(vma,68)+' (tu dois pouvoir parler).'):(d+' min de footing lent (endurance fondamentale : tu dois pouvoir parler).'); }
+  if(t==='FRAC'){ var n=(6+Math.min(w,6)); return vma?('Échauffement 12 min lent. Puis '+n+' × (1 min à ~'+paceAt(vma,100)+' = allure VMA / 1 min 30 lent à ~'+paceAt(vma,60)+'). Retour au calme 8 min lent.'):('10 min footing, puis '+n+' × (1 min vite / 1 min 30 lent), puis 8 min footing.'); }
+  if(t==='LONG'){ var dl=(40+Math.min(w*3,30)); return vma?(dl+' min en sortie longue, allure ~'+paceAt(vma,72)+' (régulière, confortable).'):(dl+' min en allure tranquille (sortie longue).'); }
   return '30 min de footing.';
 }
 function unifiedSwimFocuses(c){ return [[],['endurance'],['endurance','vitesse'],['endurance','technique','vitesse'],['endurance','vitesse','endurance','technique'],['endurance','vitesse','technique','endurance','vitesse']][Math.min(Math.max(c,0),5)]; }
 function swimLevelFromProfile(){ var l=((S.profile&&S.profile.sport_level)||'').toLowerCase(); if(l.indexOf('debut')>=0||l.indexOf('débu')>=0) return 'debutant'; if(l.indexOf('avanc')>=0||l.indexOf('expert')>=0) return 'avance'; return 'inter'; }
 function swimSummary(focus,w){ var s=buildSwimSession(swimLevelFromProfile(), focus, 45, 25); var mains=s.main.map(function(x){return x.label;}).join(' · '); return swimFocusLabel(focus)+' — ~'+s.total+' m ('+mains+')'; }
-function buildUnifiedProgram(goal,offsets,weeks,equip,start,secondary,manual){
+function buildUnifiedProgram(goal,offsets,weeks,equip,start,secondary,manual,vma){
   start=nextMonday(start);
   var isSwim=isSwimGoal(goal);
   var muscuOffs, courseOffs, split;
@@ -1641,17 +1642,18 @@ function buildUnifiedProgram(goal,offsets,weeks,equip,start,secondary,manual){
     var sess=[];
     for(var q=0;q<courseOffs.length;q++){ var dt=addDays(start,(w-1)*7+courseOffs[q]);
       if(isSwim){ var sf=cTypes[q%cTypes.length]||'endurance'; sess.push({id:'w'+w+'c'+(q+1), t:'SWIM', swim:true, focus:sf, m:swimSummary(sf,w), date:dt, done:false}); }
-      else { var ct=cTypes[q%cTypes.length]||'EF'; sess.push({id:'w'+w+'c'+(q+1), t:ct, m:unifiedCourseMain(ct,w), date:dt, done:false}); }
+      else { var ct=cTypes[q%cTypes.length]||'EF'; sess.push({id:'w'+w+'c'+(q+1), t:ct, m:unifiedCourseMain(ct,w,vma), date:dt, done:false}); }
     }
     runWeeks.push({n:w, f:'Semaine '+w, sessions:sess});
   }
   var muscu = split.muscu>0 ? {split:mSplit, perWeek:split.muscu, weeks:weeks, equip:equip, start:start, scheme:scheme, days:mdays, unified:true} : null;
-  var run = split.course>0 ? {goal:'unifie', perWeek:split.course, start:start, weeks:runWeeks, unified:true, discipline:isSwim?'natation':'course'} : null;
+  var run = split.course>0 ? {goal:'unifie', perWeek:split.course, start:start, weeks:runWeeks, unified:true, discipline:isSwim?'natation':'course', vma:vma||null} : null;
   return {muscu:muscu, run:run, split:split};
 }
 function setUpDay(i,v){ S.upDays=S.upDays||{}; S.upDays[i]=v; render(); }
 function scrProgramOpts(){
   var p=S.profile||{};
+  var vt=lastTest('vma'); var vmaDef=vt?vt.value:'';
   var tb='<div class="tbar"><button class="ic" onclick="go(\'dash\')"><i class="ti ti-chevron-left"></i></button><h2 style="font-size:19px">Programme complet</h2><span style="width:38px"></span></div>';
   var goals=['Hyrox Solo','Hyrox Double','Football','Running','Courir plus vite','Trail','Marathon','Semi-marathon','Natation','Spartan Race','Cross Training','Musculation','Force','Hypertrophie','Explosivité','Perte de poids','Recomposition corporelle','Prise de masse','Prise de masse musculaire','Santé'].map(function(x){return [x,x];});
   var eq=[['Salle de sport complète','Salle de sport complète'],['Salle de sport (basique)','Salle de sport (basique)'],['Matériel maison (haltères/barre)','Matériel maison (haltères/barre)'],['Petit matériel (élastiques, kettlebell)','Petit matériel (élastiques, kettlebell)'],['Sans matériel (poids du corps)','Sans matériel (poids du corps)']];
@@ -1664,6 +1666,8 @@ function scrProgramOpts(){
     selField('up-goal','Objectif principal',p.main_goal,goals)+
     selField('up-goal2','Objectif secondaire (optionnel)',null,goals)+
     '<div class="card"><div class="flabel">Mon planning — choisis chaque jour</div>'+dayRow+'<div class="sub" style="margin-top:10px;text-align:center;font-weight:700;color:var(--accent)">'+cCount+' jour(s) course · '+mCount+' jour(s) renfo</div></div>'+
+    selField('up-level','Niveau',p.sport_level,[['debutant','Débutant'],['intermediaire','Intermédiaire'],['avance','Avancé'],['expert','Expert']])+
+    '<div class="card"><div class="flabel">VMA (km/h) — obligatoire s\'il y a de la course</div><input id="up-vma" class="in" type="number" step="0.1" value="'+esc(vmaDef)+'" placeholder="ex : 14.5"><div class="sub" style="margin-top:6px;font-size:11px">Pas de VMA ? <span onclick="go(\'tests\')" style="color:var(--accent);font-weight:700;cursor:pointer;text-decoration:underline">Fais le test VMA (6 min)</span> dans « Mes tests » — ça calcule tes allures.</div></div>'+
     '<div class="card"><div class="flabel">Durée du programme</div><select class="in" id="up-weeks"><option value="4">4 semaines</option><option value="6" selected>6 semaines</option><option value="8">8 semaines</option></select></div>'+
     selField('up-equip','Matériel disponible',p.available_equipment,eq)+
     '<div class="card"><div class="flabel">Date de début (démarre le lundi suivant)</div><input id="up-start" class="in" type="date" value="'+today()+'"></div>'+
@@ -1675,16 +1679,20 @@ async function doCreateUnified(){
   var courseOffs=[], muscuOffs=[]; for(var i=0;i<7;i++){ var dv=(S.upDays||{})[i]; if(dv==='course')courseOffs.push(i); else if(dv==='renfo')muscuOffs.push(i); }
   var offs=courseOffs.concat(muscuOffs);
   if(!offs.length){ S.msg={k:'err',t:'Choisis au moins un jour (Course ou Renfo).'}; render(); return; }
+  var vmaEl=document.getElementById('up-vma'); var vma=parseFloat(vmaEl&&vmaEl.value)||null;
+  var lvlEl=document.getElementById('up-level'); var level=(lvlEl&&lvlEl.value)||'';
+  if(courseOffs.length && !isSwimGoal(goal) && !vma){ S.msg={k:'err',t:'Renseigne ta VMA (ou fais le test VMA 6 min dans « Mes tests ») pour calibrer les allures de course.'}; render(); return; }
   var weeks=parseInt(document.getElementById('up-weeks').value)||6;
   var eqEl=document.getElementById('up-equip'); var equip=(eqEl&&eqEl.value)||(S.profile&&S.profile.available_equipment)||'Salle de sport (basique)';
   var start=document.getElementById('up-start').value||today();
-  var prog=buildUnifiedProgram(goal,offs,weeks,equip,start,secondary,{courseOffs:courseOffs, muscuOffs:muscuOffs});
+  var prog=buildUnifiedProgram(goal,offs,weeks,equip,start,secondary,{courseOffs:courseOffs, muscuOffs:muscuOffs},vma);
   try{
     var upd={ muscu_program:prog.muscu, run_plan:prog.run };
     if(goalEl&&goalEl.value){ upd.main_goal=goalEl.value; }
+    if(level){ upd.sport_level=level; }
     var r=await db.from('profiles').update(upd).eq('id',S.user.id);
     if(r.error) throw r.error;
-    S.muscu=prog.muscu; S.runPlan=prog.run; if(S.profile){ S.profile.muscu_program=prog.muscu; S.profile.run_plan=prog.run; if(upd.main_goal)S.profile.main_goal=upd.main_goal; }
+    S.muscu=prog.muscu; S.runPlan=prog.run; if(S.profile){ S.profile.muscu_program=prog.muscu; S.profile.run_plan=prog.run; if(upd.main_goal)S.profile.main_goal=upd.main_goal; if(level)S.profile.sport_level=level; }
     S.msg={k:'ok',t:'Programme complet créé ✅ '+prog.split.muscu+' muscu + '+prog.split.course+(isSwimGoal(goal)?' natation':' course')+' / semaine. Vois-le dans l\'Agenda.'};
   }catch(e){ S.msg={k:'err',t:'Erreur : '+(e.message||e)}; }
   S.screen='dash'; render();
