@@ -833,7 +833,7 @@ function scrRuns(){
     var rows=w.sessions.map(function(s,si){
       var d=new Date(s.date+'T00:00:00'); var ds=isNaN(d)?s.date:d.toLocaleDateString('fr-FR',{weekday:'short',day:'numeric',month:'short'});
       var check=s.done?'<i class="ti ti-circle-check" style="color:var(--green);font-size:20px"></i>':'<i class="ti ti-chevron-right" style="color:var(--faint);font-size:18px"></i>';
-      return '<div class="ex" onclick="openRunSession('+wi+','+si+')" style="cursor:pointer"><div class="n" style="background:'+runTypeBg(s.t)+';color:'+runTypeCol(s.t)+'"><i class="ti '+sessIcon(s)+'"></i></div><div class="m"><div class="nm">'+ds+' · '+(s.swim?swimFocusLabel(s.focus):runTypeLabel(s.t))+'</div><div class="ds">'+esc(s.m)+'</div></div>'+check+'</div>';
+      return '<div class="ex" onclick="openRunSession('+wi+','+si+')" style="cursor:pointer"><div class="n" style="background:'+runTypeBg(s.t)+';color:'+runTypeCol(s.t)+'"><i class="ti '+sessIcon(s)+'"></i></div><div class="m"><div class="nm">'+ds+' · '+(s.swim?swimFocusLabel(s.focus):runTypeLabel(s.t))+'</div><div class="ds">'+esc(s.swim?s.m:stripHR(s.m))+'</div></div>'+check+'</div>';
     }).join('');
     return '<div class="card" style="padding:4px 14px'+(cur?';border:2px solid var(--accent)':'')+'"><div class="row" style="padding:10px 0 4px"><div class="label">Semaine '+w.n+' · '+esc(w.f)+'</div>'+(cur?'<span class="pill o">En cours</span>':'')+'</div>'+rows+'</div>';
   }).join('');
@@ -1190,7 +1190,7 @@ function scrRunSession(){
     card='<div class="banner" style="background:var(--accent-soft)"><i class="ti ti-home" style="color:var(--accent)"></i><div class="x" style="color:#1742a5"><b>Version maison — '+esc(hc.titre)+' ('+esc(hc.dur)+')</b><br><span style="color:var(--ink)">Équivalent sans sortir, effort comparable.</span></div></div>'+'<div class="card" style="padding:6px 14px">'+block('ti-flame','1. Échauffement',hc.wu)+'</div>'+'<div class="card"><div class="label" style="color:var(--accent);margin-bottom:2px"><i class="ti ti-repeat" style="vertical-align:-2px"></i> 2. Circuit — '+hc.rounds+' tours</div><div class="sub" style="margin-bottom:8px">'+esc(hc.format)+'</div>'+exRows+'<button class="btn" onclick="startRunCircuit()" style="margin-top:10px"><i class="ti ti-player-play"></i> Démarrer le circuit guidé</button><div class="sub" style="font-size:11px;margin-top:6px">Le chrono enchaîne chaque exercice et chaque repos automatiquement, avec un bip à chaque changement.</div></div>'+'<div class="card" style="padding:6px 14px">'+block('ti-stretching','3. Retour au calme',hc.cd)+'</div>';
     tip='<div class="banner" style="background:var(--amber-bg)"><i class="ti ti-bulb" style="color:var(--amber)"></i><div class="x" style="color:#7a4a12"><b>Adapte à ta forme</b><br><span style="color:var(--ink)">'+esc(hc.note)+'</span></div></div>';
   } else {
-    card='<div class="card" style="padding:6px 14px">'+block('ti-flame','1. Échauffement',base.wu)+block('ti-run','2. La séance',s.m)+block('ti-stretching','3. Retour au calme',base.cd)+'</div>';
+    card='<div class="card" style="padding:6px 14px">'+block('ti-flame','1. Échauffement',base.wu)+block('ti-run','2. La séance',courseMsgHR(s.t,s.m))+block('ti-stretching','3. Retour au calme',base.cd)+'</div>';
     tip='<div class="banner" style="background:var(--amber-bg)"><i class="ti ti-bulb" style="color:var(--amber)"></i><div class="x" style="color:#7a4a12"><b>Conseil débutant</b><br><span style="color:var(--ink)">'+esc(base.tip)+'</span></div></div>';
   }
   var btn=s.done?'<div class="banner" style="background:var(--green-bg)"><i class="ti ti-circle-check" style="color:var(--green)"></i><div class="x" style="color:var(--green)"><b>Séance faite — bravo !</b></div></div><button class="btn outline" onclick="doToggleRunDone()">Annuler « faite »</button>':'<button class="btn" onclick="doToggleRunDone()"><i class="ti ti-check"></i> Marquer comme faite</button>';
@@ -1648,13 +1648,15 @@ function paceAt(vma,pct){ return fmtPace(60/(vma*pct/100)); }
 function fcMaxEstim(){ var by=S.profile&&S.profile.birth_year; if(!by) return null; var age=(new Date().getFullYear())-Number(by); if(!(age>5&&age<100)) return null; return Math.round(208-0.7*age); }
 function hrZone(fc,lo,hi){ return '~'+Math.round(fc*lo/100)+'-'+Math.round(fc*hi/100)+' bpm'; }
 function courseHR(t){ var fc=fcMaxEstim(); if(!fc) return ''; var z={EF:[68,76],LONG:[70,78],FRAC:[88,98],RECUP:[60,70],MC:[65,75]}[t]||[68,76]; return ' · ❤️ FC cible '+hrZone(fc,z[0],z[1]); }
+function stripHR(m){ return (m||'').replace(/\s*·\s*❤️\s*FC cible[^]*$/,''); }
+function courseMsgHR(t,m){ return stripHR(m)+courseHR(t); }
 function unifiedCourseMain(t,w,vma){
   var base;
   if(t==='EF'){ var d=(25+Math.min(w*2,20)); base=vma?(d+' min en endurance fondamentale, allure ~'+paceAt(vma,68)+' (tu dois pouvoir parler).'):(d+' min de footing lent (endurance fondamentale : tu dois pouvoir parler).'); }
   else if(t==='FRAC'){ var n=(6+Math.min(w,6)); base=vma?('Échauffement 12 min lent. Puis '+n+' × (1 min à ~'+paceAt(vma,100)+' = allure VMA / 1 min 30 lent à ~'+paceAt(vma,60)+'). Retour au calme 8 min lent.'):('10 min footing, puis '+n+' × (1 min vite / 1 min 30 lent), puis 8 min footing.'); }
   else if(t==='LONG'){ var dl=(40+Math.min(w*3,30)); base=vma?(dl+' min en sortie longue, allure ~'+paceAt(vma,72)+' (régulière, confortable).'):(dl+' min en allure tranquille (sortie longue).'); }
   else base='30 min de footing.';
-  return base+courseHR(t);
+  return base;
 }
 function unifiedSwimFocuses(c){ return [[],['endurance'],['endurance','vitesse'],['endurance','technique','vitesse'],['endurance','vitesse','endurance','technique'],['endurance','vitesse','technique','endurance','vitesse']][Math.min(Math.max(c,0),5)]; }
 function swimLevelFromProfile(){ var l=((S.profile&&S.profile.sport_level)||'').toLowerCase(); if(l.indexOf('debut')>=0||l.indexOf('débu')>=0) return 'debutant'; if(l.indexOf('avanc')>=0||l.indexOf('expert')>=0) return 'avance'; return 'inter'; }
