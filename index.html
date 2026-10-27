@@ -1529,6 +1529,26 @@ var EXO_REGRESS=[
   [/soulevé de terre roumain|soulev/, [['Pont fessier',3,'15'],['Hip hinge à l\'élastique',3,'15']]]
 ];
 function regressFor(name){ var n=(name||'').toLowerCase(); for(var i=0;i<EXO_REGRESS.length;i++){ if(EXO_REGRESS[i][0].test(n)) return EXO_REGRESS[i][1]; } return []; }
+var EXO_SUBS=[
+  [/rowing australien|tirage serviette|rowing serviette/, [['Tractions (barre de porte)',3,'max'],['Rowing avec sac/bidon lesté (1 bras)',3,'12/bras'],['Rowing élastique',3,'15']]],
+  [/traction|tirage vertical|tirage/, [['Rowing australien (sous une table)',3,'max'],['Tirage élastique (haut)',3,'12-15'],['Rowing sac/bidon lesté',3,'10/bras']]],
+  [/rowing barre|rowing haltère|rowing|oiseau|face pull/, [['Rowing australien (sous une table)',3,'max'],['Tractions (si barre)',3,'max'],['Rowing élastique',3,'15']]],
+  [/pike push|développé militaire|développé épaules|élévation|épaule/, [['Pompes piquées (pike)',3,'8-12'],['Développé élastique au-dessus de la tête',3,'12'],['Élévations latérales (bouteilles/élastique)',3,'15']]],
+  [/pompe diamant|pompe serr|extension triceps|triceps|dips/, [['Dips sur chaise',3,'max'],['Pompes serrées (diamant)',3,'max'],['Extension triceps élastique',3,'15']]],
+  [/pompe|développé couché|développé incliné|pec/, [['Pompes classiques',3,'max'],['Pompes inclinées (mains surélevées)',3,'max'],['Développé élastique (pec)',3,'12']]],
+  [/squat bulgare/, [['Fentes',3,'12/jambe'],['Squat au poids du corps',3,'15-20'],['Montées sur une marche',3,'12/jambe']]],
+  [/presse|squat/, [['Squat au poids du corps',3,'15-20'],['Fentes',3,'12/jambe'],['Chaise au mur (wall sit)',3,'45 s']]],
+  [/soulevé de terre|roumain|hip thrust|pont fessier|ischio|leg curl/, [['Pont fessier (1 ou 2 jambes)',3,'15'],['Soulevé de terre roumain (sac/bidon)',3,'12'],['Good morning élastique',3,'15']]],
+  [/fente/, [['Squat bulgare',3,'10/jambe'],['Montées sur une marche',3,'12/jambe'],['Fentes statiques avec appui',3,'12/jambe']]],
+  [/mollet/, [['Mollets debout (sur une marche)',3,'20'],['Mollets une jambe',3,'15/jambe'],['Sauts à la corde (sur pointes)',3,'40']]],
+  [/curl|biceps/, [['Curl élastique',3,'15'],['Curl sac/bidon lesté',3,'12'],['Tractions supination (si barre)',3,'max']]],
+  [/gainage latéral/, [['Gainage latéral genou au sol',3,'25 s/côté'],['Russian twist',3,'20'],['Hollow hold',3,'30 s']]],
+  [/gainage|planche|hollow/, [['Gainage sur les avant-bras',3,'40 s'],['Hollow hold',3,'30 s'],['Gainage épaule (dynamique)',3,'30 s']]],
+  [/crunch|relev.{0,6}jambe|abdo|sit.?up|russian/, [['Relevés de jambes',3,'12'],['Crunch (enroulé)',3,'20'],['Mountain climbers lents',3,'30 s']]],
+  [/mountain climber|burpee|jumping|squat sauté|fente sautée/, [['Mountain climbers',3,'30 s'],['Montées de genoux',3,'40 s'],['Burpee step-back (sans saut)',3,'10']]],
+  [/superman|lombaire|extension dos|nageur|swimmer/, [['Superman',3,'15'],['Pont dorsal (bridge)',3,'12'],['Bird-dog (quadrupédie)',3,'12/côté']]]
+];
+function subsFor(name){ var n=(name||'').toLowerCase(); for(var i=0;i<EXO_SUBS.length;i++){ if(EXO_SUBS[i][0].test(n)) return EXO_SUBS[i][1]; } return []; }
 function scrExoDetail(){
   var ctx=S.exoCtx||'muscu'; var e, backScr, dEquip, dGrp, deload=false, usedArr;
   if(ctx==='workout'){
@@ -1548,12 +1568,15 @@ function scrExoDetail(){
   var video='<button class="btn" onclick="openVideo(\''+esc(e.name).replace(/[^A-Za-zÀ-ÿ0-9 ()\/-]/g,'')+'\')"><i class="ti ti-brand-youtube"></i> Voir une démo en vidéo</button>';
   var rowf=function(a,idx){ return '<div class="ex"><div class="m"><div class="nm">'+esc(a[0])+'</div><div class="ds">'+a[1]+' × '+esc(a[2])+'</div></div><button class="btn outline" style="width:auto;margin-top:0;padding:8px 12px" onclick="doSwapExo('+idx+')">Choisir</button></div>'; };
   var reg=regressFor(e.name).filter(function(a){return usedArr.indexOf(a[0])<0;});
+  var taken={}; taken[e.name]=1; reg.forEach(function(a){taken[a[0]]=1;});
+  var subs=subsFor(e.name).filter(function(a){ var ok=!taken[a[0]] && usedArr.indexOf(a[0])<0; taken[a[0]]=1; return ok; }).slice(0,3);
   var alts=[];
-  if(dGrp){ var tier=muscuEquipTier(dEquip); var lib=muscuExo(dGrp,tier); alts=lib.filter(function(a){return usedArr.indexOf(a[0])<0;}); }
-  S.selExoAlts=reg.concat(alts);
+  if(dGrp){ var tier=muscuEquipTier(dEquip); var lib=muscuExo(dGrp,tier); alts=lib.filter(function(a){ if(taken[a[0]]||usedArr.indexOf(a[0])>=0) return false; taken[a[0]]=1; return true; }); }
+  S.selExoAlts=reg.concat(subs).concat(alts);
   var easierHtml=reg.length?'<div class="label" style="margin:14px 2px 8px;color:var(--accent)"><i class="ti ti-arrow-down-circle" style="vertical-align:-2px"></i> Trop dur aujourd\'hui ? Version plus facile :</div><div class="card" style="padding:6px 14px">'+reg.map(function(a,ai){return rowf(a,ai);}).join('')+'</div>':'';
-  var otherHtml=alts.length?'<div class="label" style="margin:14px 2px 8px">Machine occupée / autre option :</div><div class="card" style="padding:6px 14px">'+alts.map(function(a,ai){return rowf(a,reg.length+ai);}).join('')+'</div>':(reg.length?'':'<div class="card"><div class="sub" style="padding:8px 0">Régénère la séance pour d\'autres options.</div></div>');
-  return tb+msg+meta+proto+video+easierHtml+otherHtml;
+  var subsHtml=subs.length?'<div class="label" style="margin:14px 2px 8px"><i class="ti ti-arrows-exchange" style="vertical-align:-2px;color:var(--accent)"></i> Exercices de substitution (équivalents) :</div><div class="card" style="padding:6px 14px">'+subs.map(function(a,ai){return rowf(a,reg.length+ai);}).join('')+'</div>':'';
+  var otherHtml=alts.length?'<div class="label" style="margin:14px 2px 8px">Autre option (selon le matériel) :</div><div class="card" style="padding:6px 14px">'+alts.map(function(a,ai){return rowf(a,reg.length+subs.length+ai);}).join('')+'</div>':((reg.length||subs.length)?'':'<div class="card"><div class="sub" style="padding:8px 0">Régénère la séance pour d\'autres options.</div></div>');
+  return tb+msg+meta+proto+video+easierHtml+subsHtml+otherHtml;
 }
 async function doSwapExo(ai){
   var alt=(S.selExoAlts||[])[ai]; if(!alt) return;
