@@ -1599,11 +1599,16 @@ function objectiveSplitBlend(primary,secondary,N){
 }
 function unifiedCourseTypes(c){ return [[],['EF'],['EF','FRAC'],['EF','FRAC','LONG'],['EF','FRAC','EF','LONG'],['EF','FRAC','EF','LONG','EF']][Math.min(Math.max(c,0),5)]; }
 function paceAt(vma,pct){ return fmtPace(60/(vma*pct/100)); }
+function fcMaxEstim(){ var by=S.profile&&S.profile.birth_year; if(!by) return null; var age=(new Date().getFullYear())-Number(by); if(!(age>5&&age<100)) return null; return Math.round(208-0.7*age); }
+function hrZone(fc,lo,hi){ return '~'+Math.round(fc*lo/100)+'-'+Math.round(fc*hi/100)+' bpm'; }
+function courseHR(t){ var fc=fcMaxEstim(); if(!fc) return ''; var z={EF:[68,76],LONG:[70,78],FRAC:[88,98],RECUP:[60,70],MC:[65,75]}[t]||[68,76]; return ' · ❤️ FC cible '+hrZone(fc,z[0],z[1]); }
 function unifiedCourseMain(t,w,vma){
-  if(t==='EF'){ var d=(25+Math.min(w*2,20)); return vma?(d+' min en endurance fondamentale, allure ~'+paceAt(vma,68)+' (tu dois pouvoir parler).'):(d+' min de footing lent (endurance fondamentale : tu dois pouvoir parler).'); }
-  if(t==='FRAC'){ var n=(6+Math.min(w,6)); return vma?('Échauffement 12 min lent. Puis '+n+' × (1 min à ~'+paceAt(vma,100)+' = allure VMA / 1 min 30 lent à ~'+paceAt(vma,60)+'). Retour au calme 8 min lent.'):('10 min footing, puis '+n+' × (1 min vite / 1 min 30 lent), puis 8 min footing.'); }
-  if(t==='LONG'){ var dl=(40+Math.min(w*3,30)); return vma?(dl+' min en sortie longue, allure ~'+paceAt(vma,72)+' (régulière, confortable).'):(dl+' min en allure tranquille (sortie longue).'); }
-  return '30 min de footing.';
+  var base;
+  if(t==='EF'){ var d=(25+Math.min(w*2,20)); base=vma?(d+' min en endurance fondamentale, allure ~'+paceAt(vma,68)+' (tu dois pouvoir parler).'):(d+' min de footing lent (endurance fondamentale : tu dois pouvoir parler).'); }
+  else if(t==='FRAC'){ var n=(6+Math.min(w,6)); base=vma?('Échauffement 12 min lent. Puis '+n+' × (1 min à ~'+paceAt(vma,100)+' = allure VMA / 1 min 30 lent à ~'+paceAt(vma,60)+'). Retour au calme 8 min lent.'):('10 min footing, puis '+n+' × (1 min vite / 1 min 30 lent), puis 8 min footing.'); }
+  else if(t==='LONG'){ var dl=(40+Math.min(w*3,30)); base=vma?(dl+' min en sortie longue, allure ~'+paceAt(vma,72)+' (régulière, confortable).'):(dl+' min en allure tranquille (sortie longue).'); }
+  else base='30 min de footing.';
+  return base+courseHR(t);
 }
 function unifiedSwimFocuses(c){ return [[],['endurance'],['endurance','vitesse'],['endurance','technique','vitesse'],['endurance','vitesse','endurance','technique'],['endurance','vitesse','technique','endurance','vitesse']][Math.min(Math.max(c,0),5)]; }
 function swimLevelFromProfile(){ var l=((S.profile&&S.profile.sport_level)||'').toLowerCase(); if(l.indexOf('debut')>=0||l.indexOf('débu')>=0) return 'debutant'; if(l.indexOf('avanc')>=0||l.indexOf('expert')>=0) return 'avance'; return 'inter'; }
@@ -1935,9 +1940,14 @@ async function saveGoals(self, arr){
 }
 var CORE_BASE=[['Gainage planche',30],['Gainage latéral droit',20],['Gainage latéral gauche',20],['Relevés de jambes',30],['Hollow hold',25]];
 function coreDone(){ if(S.profile&&S.profile.core_done!=null) return Number(S.profile.core_done)||0; try{ return parseInt(localStorage.getItem('athlon_core_done'))||0; }catch(_){ return 0; } }
-function coreLevel(){ return Math.floor(coreDone()/3); }
+function programWeeksDone(){ var byWeek={};
+  if(S.muscu&&S.muscu.days) S.muscu.days.forEach(function(d){ var k='w'+d.week; (byWeek[k]=byWeek[k]||[]).push(!!d.done); });
+  if(S.runPlan&&S.runPlan.weeks) S.runPlan.weeks.forEach(function(w){ var k='w'+w.n; byWeek[k]=byWeek[k]||[]; w.sessions.forEach(function(s){ byWeek[k].push(!!s.done); }); });
+  var done=0; Object.keys(byWeek).forEach(function(k){ var a=byWeek[k]; if(a.length && a.every(function(x){return x;})) done++; }); return done;
+}
+function coreLevel(){ return Math.max(programWeeksDone(), Math.floor(coreDone()/6)); }
 function coreParams(){ var lv=coreLevel(); var bonus=lv*5; var rounds=Math.min(3+lv,6); var rest=Math.max(10,20-lv*2); var exos=CORE_BASE.map(function(e){ return [e[0], e[1]+bonus]; }); return {level:lv, rounds:rounds, rest:rest, exos:exos}; }
-function validateCore(){ var d=coreDone()+1; try{ localStorage.setItem('athlon_core_done',String(d)); }catch(_){} if(S.profile)S.profile.core_done=d; try{ if(S.user) db.from('profiles').update({core_done:d}).eq('id',S.user.id); }catch(_){} var lv=Math.floor(d/3); if(d%3===0){ S.msg={k:'ok',t:'Séance abdos validée ! Tu passes au niveau '+lv+' 💪 — plus de tours et exercices plus longs.'}; } else { S.msg={k:'ok',t:'Séance abdos validée ! Encore '+(3-(d%3))+' pour monter de niveau.'}; } render(); }
+function validateCore(){ var d=coreDone()+1; try{ localStorage.setItem('athlon_core_done',String(d)); }catch(_){} if(S.profile)S.profile.core_done=d; try{ if(S.user) db.from('profiles').update({core_done:d}).eq('id',S.user.id); }catch(_){} S.msg={k:'ok',t:'Séance abdos validée ! 💪 Tes abdos passent au niveau supérieur dès que tu complètes une semaine entière de ton programme (niveau actuel : '+coreLevel()+').'}; render(); }
 var HIIT_BASE=[['Jumping jacks',40],['Montées de genoux',40],['Burpees',30],['Mountain climbers',40],['Squats sautés',30]];
 function hiitDone(){ if(S.profile&&S.profile.hiit_done!=null) return Number(S.profile.hiit_done)||0; try{ return parseInt(localStorage.getItem('athlon_hiit_done'))||0; }catch(_){ return 0; } }
 function hiitLevel(){ return Math.floor(hiitDone()/3); }
@@ -2006,7 +2016,7 @@ var MOBILITY=[['Rotations d\'épaules',30],['Cercles de hanches',30],['Cat-cow (
 function coreBlock(){
   var p=coreParams(); var done=coreDone();
   var rows=p.exos.map(function(e){ var q=esc(e[0]).replace(/[^A-Za-zÀ-ÿ0-9 ()\/-]/g,''); return '<div class="ex" style="align-items:center"><div class="n"><i class="ti ti-flame"></i></div><div class="m"><div class="nm">'+esc(e[0])+'</div><div class="ds">'+e[1]+' s · <span onclick="openVideo(\''+q+'\')" style="color:var(--accent);cursor:pointer;font-weight:700"><i class="ti ti-brand-youtube" style="vertical-align:-2px"></i> Vidéo</span></div></div></div>'; }).join('');
-  return '<div class="card"><div class="row" style="margin-bottom:2px"><div class="label" style="color:var(--accent)"><i class="ti ti-flame" style="vertical-align:-2px"></i> Abdos & gainage — niveau '+p.level+'</div><span class="sub">'+done+' validée(s)</span></div><div class="sub" style="margin-bottom:8px">Séance au temps · <b>'+p.rounds+' tours</b> · repos '+p.rest+' s. Elle se corse à chaque validation.</div>'+rows+'<button class="btn" onclick="startCoreCircuit()" style="margin-top:9px"><i class="ti ti-player-play"></i> Démarrer en guidé ('+p.rounds+' tours)</button><button class="btn outline" onclick="validateCore()" style="margin-top:8px"><i class="ti ti-check"></i> Valider ma séance abdos</button></div>';
+  return '<div class="card"><div class="row" style="margin-bottom:2px"><div class="label" style="color:var(--accent)"><i class="ti ti-flame" style="vertical-align:-2px"></i> Abdos & gainage — niveau '+p.level+'</div><span class="sub">'+done+' validée(s)</span></div><div class="sub" style="margin-bottom:8px">Séance au temps · <b>'+p.rounds+' tours</b> · repos '+p.rest+' s. Elle se renforce à chaque <b>semaine complète</b> de ton programme.</div>'+rows+'<button class="btn" onclick="startCoreCircuit()" style="margin-top:9px"><i class="ti ti-player-play"></i> Démarrer en guidé ('+p.rounds+' tours)</button><button class="btn outline" onclick="validateCore()" style="margin-top:8px"><i class="ti ti-check"></i> Valider ma séance abdos</button></div>';
 }
 function setFin(k,v){ S.finisher=S.finisher||{type:'deux',mins:10}; S.finisher[k]=v; render(); }
 function finisherRoutine(){
