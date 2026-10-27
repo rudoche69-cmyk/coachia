@@ -1357,6 +1357,21 @@ function muscuWeekHint(w,total,deload,scheme){
   var per={ force:'monte la charge (~+2,5 %) en gardant les reps basses et une exécution nette.', masse:'ajoute 1 répétition par exercice vs la semaine dernière ; une fois en haut de la fourchette, augmente la charge.', hyrox:'plus de répétitions et de densité, réduis un peu les temps de repos.', endurance:'allonge les séries (charges légères) et enchaîne avec peu de repos.', forme:'ajoute quelques répétitions en gardant un bon rythme et une technique propre.' }[scheme||'masse']||'progresse un peu par rapport à la semaine dernière.';
   return 'Semaine '+w+' — '+per;
 }
+function goalFin(scheme){
+  // Finisher de fin de séance spécifique à l'objectif du programme.
+  return {
+    force:{t:'Finisher force — Explosivité',x:'3 séries de 3 répétitions EXPLOSIVES sur le mouvement principal du jour (charge légère ~50 %, vitesse max à la montée, contrôle à la descente). 2 min de récup entre les séries. On cherche la vitesse, pas la fatigue.'},
+    masse:{t:'Finisher masse — Congestion',x:'1 exercice d\'isolation du groupe travaillé, en drop-set : série jusqu\'à l\'échec → baisse la charge de ~30 % → repars jusqu\'à l\'échec → encore une baisse et termine. 1 seul passage, ça brûle.'},
+    endurance:{t:'Finisher coureur — Renfo spécifique',x:'3 tours enchaînés sans repos : gainage planche 40 s + 15 mollets (1 jambe) + gainage latéral 20 s/côté + 20 fentes alternées. Renforce les appuis et le tronc du coureur.'},
+    forme:{t:'Finisher métabolique — Brûle-graisses',x:'AMRAP 6 min (un maximum de tours) : 8 burpees + 12 squats au poids du corps + 20 mountain climbers. Récup libre si besoin, mais garde le rythme.'},
+    hyrox:{t:'Finisher fonctionnel',x:'3 tours à intensité modérée (pas à fond) : 10 burpees + 15 fentes sautées + 40 s de gainage. Récup 1 min entre les tours. Travail de gaz léger en complément.'}
+  }[scheme]||null;
+}
+function goalFinisherBlock(d){
+  var scheme=(S.muscu&&S.muscu.scheme)||null; var f=goalFin(scheme); if(!f) return '';
+  if(d&&d.deload) return '<div class="card" style="border:1px dashed var(--line)"><div class="row" style="margin-bottom:2px"><span class="label"><i class="ti ti-flame" style="vertical-align:-2px;color:var(--faint)"></i> Bloc objectif</span><span class="pill">décharge</span></div><div class="sub">Semaine de récupération : finisher optionnel. Si tu le fais, reste léger et sans aller à l\'échec.</div></div>';
+  return '<div class="card" style="background:var(--accent-soft)"><div class="row" style="margin-bottom:4px"><span class="label" style="color:#1742a5"><i class="ti ti-flame" style="vertical-align:-2px;color:var(--accent)"></i> '+esc(f.t)+'</span><span class="pill o">objectif</span></div><div class="sub" style="color:var(--ink)">'+esc(f.x)+'</div><div class="sub" style="margin-top:6px;font-size:11px;color:var(--faint)">Adapté à ton objectif · à faire en fin de séance.</div></div>';
+}
 function muscuProgress(){ var p=S.muscu; if(!p) return {done:0,total:0}; var d=0; (p.days||[]).forEach(function(x){ if(x.done)d++; }); return {done:d,total:(p.days||[]).length}; }
 function scrMuscu(){
   var tb='<div class="tbar"><button class="ic" onclick="go(\'dash\')"><i class="ti ti-chevron-left"></i></button><h2 style="font-size:19px">Programme muscu</h2><span style="width:38px"></span></div>';
@@ -1429,7 +1444,7 @@ function scrMuscuDay(){
   var isToday=(d.date===today());
   var lighten=(isToday&&!d.done&&!d.lightened&&restAdviceCard())?'<button class="btn outline" onclick="doLightenMuscuDay()" style="margin-bottom:12px"><i class="ti ti-battery-2"></i> Pas la forme ? Alléger cette séance</button>':'';
   var lightBadge=d.lightened?'<div class="banner" style="background:var(--green-bg)"><i class="ti ti-battery-2" style="color:var(--green)"></i><div class="x" style="color:var(--green)">Séance allégée pour ménager ta récupération.</div></div>':'';
-  return tb+msg+head+extC+hint+(isToday?restAdviceCard():'')+lightBadge+lighten+'<button class="btn outline" onclick="startStopwatch()" style="margin-bottom:12px"><i class="ti ti-stopwatch"></i> Chrono de séance</button>'+'<div class="card" style="padding:6px 14px">'+list+'</div><button class="btn outline" onclick="doSaveMuscuLoads()" style="margin-bottom:9px"><i class="ti ti-device-floppy"></i> Enregistrer mes charges</button>'+coreBlock()+finisherBlock()+regen+rpeBlock('muscu')+btnDone;
+  return tb+msg+head+extC+hint+(isToday?restAdviceCard():'')+lightBadge+lighten+'<button class="btn outline" onclick="startStopwatch()" style="margin-bottom:12px"><i class="ti ti-stopwatch"></i> Chrono de séance</button>'+'<div class="card" style="padding:6px 14px">'+list+'</div><button class="btn outline" onclick="doSaveMuscuLoads()" style="margin-bottom:9px"><i class="ti ti-device-floppy"></i> Enregistrer mes charges</button>'+goalFinisherBlock(d)+coreBlock()+finisherBlock()+regen+rpeBlock('muscu')+btnDone;
 }
 async function doSaveMuscuLoads(){
   var idx=S.selMuscuDay; if(idx==null||!S.muscu) return; var d=S.muscu.days[idx];
